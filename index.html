@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>光路图孔位固定原型</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <strong>光路图绘制</strong>
+          <span>孔位固定原型</span>
+        </div>
+
+        <section>
+          <h2>光学桌</h2>
+          <label>
+            桌面尺寸
+            <select id="tablePreset">
+              <option value="300x300">300 x 300 mm 面包板</option>
+              <option value="450x300">450 x 300 mm 面包板</option>
+              <option value="600x450">600 x 450 mm 光学桌</option>
+            </select>
+          </label>
+          <div class="meta-grid">
+            <span>孔距</span><strong>25 mm</strong>
+            <span>边距</span><strong>25 mm</strong>
+          </div>
+        </section>
+
+        <section>
+          <h2>元件库</h2>
+          <button id="addSource" type="button">添加光源</button>
+          <button id="addMirror" type="button">添加反射镜架</button>
+          <button id="addLens" type="button">添加透镜架</button>
+        </section>
+
+        <section>
+          <h2>选中元件</h2>
+          <div id="emptyState" class="empty">点击元件后编辑固定方式</div>
+          <div id="inspector" class="inspector" hidden>
+            <label>
+              元件角度
+              <div class="input-row">
+                <input id="componentRotation" type="range" min="-180" max="180" value="0" />
+                <input id="componentRotationNumber" type="number" min="-180" max="180" step="1" value="0" />
+              </div>
+              <output id="componentRotationValue">0 deg</output>
+            </label>
+            <label>
+              压板角度
+              <input id="clampRotation" type="range" min="-180" max="180" value="0" />
+              <output id="clampRotationValue">0 deg</output>
+            </label>
+            <label>
+              最大自动转角
+              <input id="clampFlex" type="range" min="0" max="180" value="180" />
+              <output id="clampFlexValue">180 deg</output>
+            </label>
+            <label id="wavelengthControls" hidden>
+              光源波长
+              <input id="wavelengthInput" type="number" min="200" max="2000" step="1" value="650" />
+              <output id="wavelengthValue">650 nm</output>
+            </label>
+            <div id="lockStatus" class="status"></div>
+          </div>
+        </section>
+
+        <section>
+          <h2>固定规则</h2>
+          <p>
+            拖动元件后压板会自动选择最小转角的可用孔位。压板之间不能重合；螺丝被支架挡住时仍可固定，但会显示警告。
+          </p>
+        </section>
+
+        <section>
+          <h2>反射规则</h2>
+          <p>
+            光源沿元件角度发射光线。光线碰到反射镜线段后，按照入射角等于反射角自动生成下一段。
+          </p>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <div class="toolbar">
+          <button id="resetView" type="button">重置视图</button>
+          <button id="clearAll" type="button">清空元件</button>
+          <span id="readout">1 px = 1 mm</span>
+        </div>
+        <div class="canvas-shell">
+          <svg id="canvas" aria-label="光学桌画布"></svg>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
