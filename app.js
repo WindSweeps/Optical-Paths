@@ -1,10 +1,20 @@
 const svg = document.querySelector("#canvas");
 const tablePreset = document.querySelector("#tablePreset");
-const addSource = document.querySelector("#addSource");
-const addMirror = document.querySelector("#addMirror");
-const addLens = document.querySelector("#addLens");
+const openComponentPicker = document.querySelector("#openComponentPicker");
 const resetView = document.querySelector("#resetView");
 const clearAll = document.querySelector("#clearAll");
+const placementBar = document.querySelector("#placementBar");
+const pendingComponentName = document.querySelector("#pendingComponentName");
+const cancelPlacement = document.querySelector("#cancelPlacement");
+const confirmPlacement = document.querySelector("#confirmPlacement");
+const componentPicker = document.querySelector("#componentPicker");
+const closeComponentPicker = document.querySelector("#closeComponentPicker");
+const cancelComponentPicker = document.querySelector("#cancelComponentPicker");
+const confirmComponentPicker = document.querySelector("#confirmComponentPicker");
+const componentSearch = document.querySelector("#componentSearch");
+const componentTypeFilter = document.querySelector("#componentTypeFilter");
+const componentCatalog = document.querySelector("#componentCatalog");
+const pickerSelectionSummary = document.querySelector("#pickerSelectionSummary");
 const inspector = document.querySelector("#inspector");
 const emptyState = document.querySelector("#emptyState");
 const componentRotation = document.querySelector("#componentRotation");
@@ -26,6 +36,32 @@ const presets = {
   "450x300": { width: 450, height: 300, pitch: 25, margin: 25 },
   "600x450": { width: 600, height: 450, pitch: 25, margin: 25 },
 };
+const catalog = [
+  {
+    id: "laser-source",
+    name: "激光光源",
+    type: "source",
+    typeLabel: "光源",
+    kind: "source",
+    thumbnailClass: "thumbnail-source",
+  },
+  {
+    id: "mirror-mount",
+    name: "反射镜架",
+    type: "reflector",
+    typeLabel: "反射元件",
+    kind: "mirror",
+    thumbnailClass: "thumbnail-mirror",
+  },
+  {
+    id: "lens-mount",
+    name: "透镜架",
+    type: "transmissive",
+    typeLabel: "透射元件",
+    kind: "lens",
+    thumbnailClass: "thumbnail-lens",
+  },
+];
 
 const state = {
   table: presets["300x300"],
@@ -37,6 +73,8 @@ const state = {
   drag: null,
   clickContext: null,
   suppressNextClick: false,
+  pendingComponentId: null,
+  pickerSelectedCatalogId: null,
 };
 
 function createSvg(tag, attrs = {}) {
@@ -341,21 +379,62 @@ function evaluateClamp(component) {
   };
 }
 
-function autoResolveClampAngles() {
-  state.components.forEach((component) => {
-    const result = evaluateClamp(component);
-    component.lastClampAdjustmentDeg = result.valid ? result.angleDelta : 0;
-    component.lastScrewBlocked = result.valid && result.screwBlocked;
-    if (result.valid) {
-      component.clamp.rotation = result.effectiveClampRotation;
-    }
-  });
+function snapshotClampResult(result) {
+  return {
+    valid: result.valid,
+    candidate: result.candidate ? { ...result.candidate } : null,
+    angleDelta: result.angleDelta,
+    effectiveClampRotation: result.effectiveClampRotation,
+    screwBlocked: result.screwBlocked,
+    blockedByClampOverlap: result.blockedByClampOverlap,
+  };
 }
 
-function makeComponent(kind) {
+function getStoredClampResult(component) {
+  const stored = component.resolvedClamp ?? snapshotClampResult(evaluateClamp(component));
+  const clamp = component.clamp;
+  const effectiveRotation = stored.effectiveClampRotation ?? clamp.rotation;
+  const virtualClamp = { ...clamp, rotation: effectiveRotation };
+  const virtualComponent = { ...component, clamp: virtualClamp };
+  return {
+    ...stored,
+    effectiveClampRotation: effectiveRotation,
+    slotStart: clampLocalToWorld(virtualComponent, virtualClamp, clamp.slotStart),
+    slotEnd: clampLocalToWorld(virtualComponent, virtualClamp, clamp.slotEnd),
+  };
+}
+
+function resolveClampAngle(component) {
+  const result = evaluateClamp(component);
+  component.lastClampAdjustmentDeg = result.valid ? result.angleDelta : 0;
+  component.lastScrewBlocked = result.valid && result.screwBlocked;
+  if (result.valid) {
+    component.clamp.rotation = result.effectiveClampRotation;
+  }
+  component.resolvedClamp = snapshotClampResult(result);
+  component.needsClampResolve = false;
+}
+
+function autoResolveClampAngles() {
+  const activeId = state.pendingComponentId ?? state.drag?.id;
+  if (activeId) {
+    const activeComponent = state.components.find((component) => component.id === activeId);
+    if (activeComponent) resolveClampAngle(activeComponent);
+    return;
+  }
+
+  state.components
+    .filter((component) => component.needsClampResolve || !component.resolvedClamp)
+    .forEach(resolveClampAngle);
+}
+
+function makeComponent(kind, options = {}) {
   const base = {
     id: crypto.randomUUID(),
     kind,
+    catalogId: options.catalogId ?? null,
+    placementState: options.placementState ?? "placed",
+    needsClampResolve: true,
     position: { x: 105 + state.components.length * 35, y: 120 },
     rotation: 0,
     clamp: {
@@ -419,6 +498,7 @@ function render() {
   renderBeams();
   renderActiveClamp();
   renderInspector();
+  renderPlacementUi();
   readout.textContent = `${state.scale.toFixed(2)} px = 1 mm`;
 }
 
@@ -445,7 +525,7 @@ function renderTable() {
   );
 
   const selected = getSelected();
-  const selectedClamp = selected ? evaluateClamp(selected) : null;
+  const selectedClamp = selected ? getStoredClampResult(selected) : null;
   generateHoles(state.table).forEach((hole) => {
     const screen = worldToScreen(hole);
     const isCandidate =
@@ -465,8 +545,9 @@ function renderTable() {
 
 function renderComponent(component) {
   const isSelected = component.id === state.selectedId;
+  const isPending = component.id === state.pendingComponentId;
   const group = createSvg("g", {
-    class: isSelected ? "component selected" : "component",
+    class: `component${isSelected ? " selected" : ""}${isPending ? " pending" : ""}`,
     "data-id": component.id,
     "data-component-id": component.id,
   });
@@ -478,7 +559,18 @@ function renderComponent(component) {
   );
 
   const { width, height } = component.size;
-  if (isSelected) {
+  if (isPending) {
+    group.appendChild(
+      createSvg("rect", {
+        class: "pending-outline",
+        x: -width / 2 - 10,
+        y: -height / 2 - 10,
+        width: width + 20,
+        height: height + 20,
+        rx: 9,
+      }),
+    );
+  } else if (isSelected) {
     group.appendChild(
       createSvg("rect", {
         class: "selected-outline",
@@ -562,14 +654,14 @@ function renderComponent(component) {
 }
 
 function getActiveClampComponentId() {
-  return state.drag?.id ?? state.selectedId;
+  return state.drag?.id ?? state.pendingComponentId ?? state.selectedId;
 }
 
 function renderInactiveClamps() {
   const activeId = getActiveClampComponentId();
   state.components.forEach((component) => {
     if (component.id !== activeId) {
-      renderClamp(component, evaluateClamp(component), false);
+      renderClamp(component, getStoredClampResult(component), false);
     }
   });
 }
@@ -578,7 +670,7 @@ function renderActiveClamp() {
   const activeId = getActiveClampComponentId();
   const component = state.components.find((item) => item.id === activeId);
   if (!component) return;
-  renderClamp(component, evaluateClamp(component), true);
+  renderClamp(component, getStoredClampResult(component), true);
 }
 
 function getSourceRay(component) {
@@ -636,7 +728,9 @@ function applyOpticalInteraction(component, beamState) {
 
 function traceBeam(source) {
   const segments = [];
-  const mirrors = state.components.filter((item) => item.optic === "mirror").map(getMirrorSegment);
+  const mirrors = state.components
+    .filter((item) => item.optic === "mirror" && item.placementState === "placed")
+    .map(getMirrorSegment);
   let { origin, direction, wavelengthNm } = getSourceRay(source);
   const usedHits = new Set();
 
@@ -678,7 +772,7 @@ function traceBeam(source) {
 function renderBeams() {
   const beamGroup = createSvg("g", { class: "beam-layer" });
   state.components
-    .filter((component) => component.optic === "source")
+    .filter((component) => component.optic === "source" && component.placementState === "placed")
     .forEach((source) => {
       traceBeam(source).forEach((segment, index) => {
         const start = worldToScreen(segment.start);
@@ -700,11 +794,12 @@ function renderBeams() {
 }
 
 function renderClamp(component, result, isSelected) {
+  const isPending = component.id === state.pendingComponentId;
   const pivot = localToWorld(component, component.clamp.pivot);
   const pivotScreen = worldToScreen(pivot);
   const angle = component.rotation + result.effectiveClampRotation;
   const clampGroup = createSvg("g", {
-    class: isSelected ? "clamp-group selected" : "clamp-group",
+    class: `clamp-group${isSelected ? " selected" : ""}${isPending ? " pending" : ""}`,
     "data-component-id": component.id,
     transform: `translate(${pivotScreen.x} ${pivotScreen.y}) rotate(${angle}) scale(${state.scale})`,
   });
@@ -763,7 +858,7 @@ function renderInspector() {
     wavelengthValue.textContent = `${selected.wavelengthNm ?? 650} nm`;
   }
 
-  const result = evaluateClamp(selected);
+  const result = getStoredClampResult(selected);
   lockStatus.className = `status ${result.valid ? (result.screwBlocked ? "warning" : "valid") : "invalid"}`;
   if (result.valid) {
     const lastAdjustment = selected.lastClampAdjustmentDeg ?? result.angleDelta;
@@ -792,6 +887,17 @@ function renderInspector() {
   }
 }
 
+function renderPlacementUi() {
+  const pending = state.components.find((component) => component.id === state.pendingComponentId);
+  placementBar.hidden = !pending;
+  openComponentPicker.disabled = Boolean(pending);
+  if (!pending) return;
+
+  const result = getStoredClampResult(pending);
+  pendingComponentName.textContent = pending.name;
+  confirmPlacement.disabled = !result.valid;
+}
+
 function getSelected() {
   return state.components.find((item) => item.id === state.selectedId) ?? null;
 }
@@ -811,6 +917,97 @@ function selectComponent(id) {
 
 function componentIdFromEventTarget(target) {
   return target.closest("[data-component-id]")?.dataset.componentId ?? null;
+}
+
+function renderComponentCatalog() {
+  const query = componentSearch.value.trim().toLowerCase();
+  const type = componentTypeFilter.value;
+  const filteredCatalog = catalog.filter((item) => {
+    const matchesType = type === "all" || item.type === type;
+    const matchesQuery =
+      query === "" ||
+      item.name.toLowerCase().includes(query) ||
+      item.typeLabel.toLowerCase().includes(query);
+    return matchesType && matchesQuery;
+  });
+
+  componentCatalog.replaceChildren();
+  filteredCatalog.forEach((item) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `catalog-item${item.id === state.pickerSelectedCatalogId ? " selected" : ""}`;
+    button.dataset.catalogId = item.id;
+    button.innerHTML = `
+      <div class="catalog-thumbnail ${item.thumbnailClass}"></div>
+      <strong>${item.name}</strong>
+      <span>${item.typeLabel}</span>
+    `;
+    componentCatalog.appendChild(button);
+  });
+
+  if (filteredCatalog.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "没有符合筛选条件的元件。";
+    componentCatalog.appendChild(empty);
+  }
+
+  const selectedItem = catalog.find((item) => item.id === state.pickerSelectedCatalogId);
+  pickerSelectionSummary.textContent = selectedItem
+    ? `已选择：${selectedItem.name} · ${selectedItem.typeLabel}`
+    : "尚未选择元件";
+  confirmComponentPicker.disabled = !selectedItem;
+}
+
+function openPicker() {
+  if (state.pendingComponentId) return;
+  state.pickerSelectedCatalogId = null;
+  componentSearch.value = "";
+  componentTypeFilter.value = "all";
+  componentPicker.hidden = false;
+  renderComponentCatalog();
+  componentSearch.focus();
+}
+
+function closePicker() {
+  componentPicker.hidden = true;
+  state.pickerSelectedCatalogId = null;
+}
+
+function addPendingComponent(catalogItem) {
+  const component = makeComponent(catalogItem.kind, {
+    catalogId: catalogItem.id,
+    placementState: "pending",
+  });
+  component.name = catalogItem.name;
+  component.position = {
+    x: state.table.width / 2,
+    y: state.table.height / 2,
+  };
+  state.components.push(component);
+  state.pendingComponentId = component.id;
+  state.selectedId = component.id;
+  closePicker();
+  render();
+}
+
+function discardPendingComponent() {
+  if (!state.pendingComponentId) return;
+  state.components = state.components.filter((component) => component.id !== state.pendingComponentId);
+  state.pendingComponentId = null;
+  state.selectedId = null;
+  render();
+}
+
+function placePendingComponent() {
+  const pending = state.components.find((component) => component.id === state.pendingComponentId);
+  if (!pending) return;
+  const result = getStoredClampResult(pending);
+  if (!result.valid) return;
+  pending.placementState = "placed";
+  state.pendingComponentId = null;
+  state.selectedId = pending.id;
+  render();
 }
 
 svg.addEventListener("pointerdown", (event) => {
@@ -851,7 +1048,7 @@ svg.addEventListener("pointerup", (event) => {
   if (state.drag) {
     const finishedDrag = state.drag;
     state.suppressNextClick = true;
-    if (!finishedDrag.moved && finishedDrag.wasSelected) {
+    if (!finishedDrag.moved && finishedDrag.wasSelected && finishedDrag.id !== state.pendingComponentId) {
       state.selectedId = null;
     } else {
       state.selectedId = finishedDrag.id;
@@ -871,7 +1068,7 @@ svg.addEventListener("click", (event) => {
 
   const id = componentIdFromEventTarget(event.target);
   if (!id) {
-    state.selectedId = null;
+    if (!state.pendingComponentId) state.selectedId = null;
     state.clickContext = null;
     render();
     return;
@@ -890,6 +1087,7 @@ componentRotation.addEventListener("input", () => {
   const selected = getSelected();
   if (!selected) return;
   selected.rotation = Number(componentRotation.value);
+  selected.needsClampResolve = true;
   render();
 });
 
@@ -901,6 +1099,7 @@ componentRotationNumber.addEventListener("input", () => {
   const numericValue = Number(rawValue);
   if (!Number.isFinite(numericValue)) return;
   selected.rotation = Math.max(-180, Math.min(180, numericValue));
+  selected.needsClampResolve = true;
   render();
 });
 
@@ -908,11 +1107,14 @@ clampRotation.addEventListener("input", () => {
   const selected = getSelected();
   if (!selected) return;
   selected.clamp.rotation = Number(clampRotation.value);
+  selected.needsClampResolve = true;
   render();
 });
 
 clampFlex.addEventListener("input", () => {
   state.maxAutoTurnDeg = Number(clampFlex.value);
+  const selected = getSelected();
+  if (selected) selected.needsClampResolve = true;
   render();
 });
 
@@ -925,28 +1127,34 @@ wavelengthInput.addEventListener("input", () => {
 
 tablePreset.addEventListener("change", () => {
   state.table = presets[tablePreset.value];
+  state.components.forEach((component) => {
+    component.needsClampResolve = true;
+  });
   render();
 });
 
-addSource.addEventListener("click", () => {
-  const component = makeComponent("source");
-  state.components.push(component);
-  state.selectedId = component.id;
-  render();
+openComponentPicker.addEventListener("click", openPicker);
+closeComponentPicker.addEventListener("click", closePicker);
+cancelComponentPicker.addEventListener("click", closePicker);
+cancelPlacement.addEventListener("click", discardPendingComponent);
+confirmPlacement.addEventListener("click", placePendingComponent);
+componentSearch.addEventListener("input", renderComponentCatalog);
+componentTypeFilter.addEventListener("change", renderComponentCatalog);
+componentCatalog.addEventListener("click", (event) => {
+  const item = event.target.closest("[data-catalog-id]");
+  if (!item) return;
+  state.pickerSelectedCatalogId = item.dataset.catalogId;
+  renderComponentCatalog();
 });
-
-addMirror.addEventListener("click", () => {
-  const component = makeComponent("mirror");
-  state.components.push(component);
-  state.selectedId = component.id;
-  render();
+confirmComponentPicker.addEventListener("click", () => {
+  const selectedItem = catalog.find((item) => item.id === state.pickerSelectedCatalogId);
+  if (selectedItem) addPendingComponent(selectedItem);
 });
-
-addLens.addEventListener("click", () => {
-  const component = makeComponent("lens");
-  state.components.push(component);
-  state.selectedId = component.id;
-  render();
+componentPicker.addEventListener("click", (event) => {
+  if (event.target === componentPicker) closePicker();
+});
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !componentPicker.hidden) closePicker();
 });
 
 resetView.addEventListener("click", () => {
@@ -958,6 +1166,7 @@ resetView.addEventListener("click", () => {
 clearAll.addEventListener("click", () => {
   state.components = [];
   state.selectedId = null;
+  state.pendingComponentId = null;
   render();
 });
 

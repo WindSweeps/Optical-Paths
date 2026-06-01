@@ -32,9 +32,7 @@
 
         <section>
           <h2>元件库</h2>
-          <button id="addSource" type="button">添加光源</button>
-          <button id="addMirror" type="button">添加反射镜架</button>
-          <button id="addLens" type="button">添加透镜架</button>
+          <button id="openComponentPicker" class="primary-button" type="button">添加元件</button>
         </section>
 
         <section>
@@ -89,11 +87,53 @@
           <button id="clearAll" type="button">清空元件</button>
           <span id="readout">1 px = 1 mm</span>
         </div>
+        <div id="placementBar" class="placement-bar" hidden>
+          <span class="placement-indicator"></span>
+          <div>
+            <strong>悬置：<span id="pendingComponentName"></span></strong>
+            <small>拖动元件预览孔位与压板位置，确认后再置入光路。</small>
+          </div>
+          <button id="cancelPlacement" type="button">取消</button>
+          <button id="confirmPlacement" class="primary-button" type="button">置入</button>
+        </div>
         <div class="canvas-shell">
           <svg id="canvas" aria-label="光学桌画布"></svg>
         </div>
       </section>
     </main>
+
+    <div id="componentPicker" class="modal-backdrop" hidden>
+      <div class="picker-dialog" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+        <header class="picker-header">
+          <div>
+            <h1 id="pickerTitle">选择光学元件</h1>
+            <p>从元件库中选择一个器件加入画布。</p>
+          </div>
+          <button id="closeComponentPicker" class="icon-button" type="button" aria-label="关闭">×</button>
+        </header>
+        <div class="picker-toolbar">
+          <label>
+            搜索元件
+            <input id="componentSearch" type="search" placeholder="输入名称" />
+          </label>
+          <label>
+            元件类型
+            <select id="componentTypeFilter">
+              <option value="all">全部类型</option>
+              <option value="source">光源</option>
+              <option value="reflector">反射元件</option>
+              <option value="transmissive">透射元件</option>
+            </select>
+          </label>
+        </div>
+        <div id="componentCatalog" class="component-catalog"></div>
+        <footer class="picker-footer">
+          <span id="pickerSelectionSummary">尚未选择元件</span>
+          <button id="cancelComponentPicker" type="button">取消</button>
+          <button id="confirmComponentPicker" class="primary-button" type="button" disabled>确定</button>
+        </footer>
+      </div>
+    </div>
 
     <script src="./app.js"></script>
   </body>
