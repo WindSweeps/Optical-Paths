@@ -36,32 +36,14 @@ const presets = {
   "450x300": { width: 450, height: 300, pitch: 25, margin: 25 },
   "600x450": { width: 600, height: 450, pitch: 25, margin: 25 },
 };
-const catalog = [
-  {
-    id: "laser-source",
-    name: "激光光源",
-    type: "source",
-    typeLabel: "光源",
-    kind: "source",
-    thumbnailClass: "thumbnail-source",
-  },
-  {
-    id: "mirror-mount",
-    name: "反射镜架",
-    type: "reflector",
-    typeLabel: "反射元件",
-    kind: "mirror",
-    thumbnailClass: "thumbnail-mirror",
-  },
-  {
-    id: "lens-mount",
-    name: "透镜架",
-    type: "transmissive",
-    typeLabel: "透射元件",
-    kind: "lens",
-    thumbnailClass: "thumbnail-lens",
-  },
-];
+const publishedLibrary = window.OPTICAL_COMPONENT_LIBRARY;
+if (!publishedLibrary?.components?.length) {
+  throw new Error("Published component library is missing or empty.");
+}
+const catalog = publishedLibrary.components.map((component) => ({
+  ...component,
+  thumbnailClass: `thumbnail-${component.visualKind}`,
+}));
 
 const state = {
   table: presets["300x300"],
@@ -200,8 +182,12 @@ function localToWorld(component, localPoint) {
   return add(component.position, rotatePoint(localPoint, component.rotation));
 }
 
+function getPostCenter(component) {
+  return { x: component.post.centerX, y: component.post.centerY };
+}
+
 function clampLocalToWorld(component, clamp, localPoint) {
-  const pivotWorld = localToWorld(component, clamp.pivot);
+  const pivotWorld = localToWorld(component, getPostCenter(component));
   const rotated = rotatePoint(localPoint, component.rotation + clamp.rotation);
   return add(pivotWorld, rotated);
 }
@@ -237,44 +223,127 @@ function rectPolygon(x, y, width, height) {
   ];
 }
 
+function circlePolygon(centerX, centerY, radius, segments = 20) {
+  return Array.from({ length: segments }, (_, index) => {
+    const angle = (index / segments) * Math.PI * 2;
+    return {
+      x: centerX + Math.cos(angle) * radius,
+      y: centerY + Math.sin(angle) * radius,
+    };
+  });
+}
+
+function arcPoints(center, radius, startAngle, endAngle, segments = 12) {
+  return Array.from({ length: segments + 1 }, (_, index) => {
+    const angle = startAngle + ((endAngle - startAngle) * index) / segments;
+    return {
+      x: center.x + Math.cos(angle) * radius,
+      y: center.y + Math.sin(angle) * radius,
+    };
+  });
+}
+
+function ellipseArcPoints(center, radiusX, radiusY, startAngle, endAngle, segments = 12) {
+  return Array.from({ length: segments + 1 }, (_, index) => {
+    const angle = startAngle + ((endAngle - startAngle) * index) / segments;
+    return {
+      x: center.x + Math.cos(angle) * radiusX,
+      y: center.y + Math.sin(angle) * radiusY,
+    };
+  });
+}
+
+function forkClampPolygon(clamp) {
+  const end = clamp.slotEnd;
+  const lengthToEnd = length(end);
+  if (lengthToEnd < 0.001) return circlePolygon(0, 0, clamp.width / 2);
+  const rotation = Math.atan2(end.y, end.x);
+  const halfWidth = Math.max(0.5, clamp.width / 2);
+  const endLength = Math.max(0.5, clamp.endLength);
+  const forkRadius = Math.max(halfWidth + 0.5, clamp.forkOuterDiameter / 2);
+  const clearanceRadius = Math.min(forkRadius - 0.5, Math.max(0.5, clamp.forkClearanceDiameter / 2));
+  const bodyAngle = Math.asin(halfWidth / forkRadius);
+  const joinX = Math.sqrt(forkRadius * forkRadius - halfWidth * halfWidth);
+  const points = [
+    { x: 0, y: -forkRadius },
+    { x: 0, y: -clearanceRadius },
+    ...arcPoints({ x: 0, y: 0 }, clearanceRadius, -Math.PI / 2, Math.PI / 2).slice(1),
+    { x: 0, y: forkRadius },
+    ...arcPoints({ x: 0, y: 0 }, forkRadius, Math.PI / 2, bodyAngle).slice(1),
+    { x: joinX, y: halfWidth },
+    { x: lengthToEnd, y: halfWidth },
+    ...ellipseArcPoints({ x: lengthToEnd, y: 0 }, endLength, halfWidth, Math.PI / 2, -Math.PI / 2).slice(1),
+    { x: joinX, y: -halfWidth },
+    ...arcPoints({ x: 0, y: 0 }, forkRadius, -bodyAngle, -Math.PI / 2).slice(1),
+  ];
+  return points.map((point) => rotatePoint(point, radToDeg(rotation)));
+}
+
+function forkClampPath(clamp) {
+  const points = forkClampPolygon(clamp);
+  return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ") + " Z";
+}
+
 function transformComponentPolygon(component, points) {
   return points.map((point) => localToWorld(component, point));
 }
 
 function transformClampPolygon(component, clampRotationDeg) {
-  const pivotWorld = localToWorld(component, component.clamp.pivot);
+  const pivotWorld = localToWorld(component, getPostCenter(component));
   const totalRotation = component.rotation + clampRotationDeg;
-  return rectPolygon(8, -7, 72, 14).map((point) => add(pivotWorld, rotatePoint(point, totalRotation)));
+  return forkClampPolygon(component.clamp).map((point) =>
+    add(pivotWorld, rotatePoint(point, totalRotation)),
+  );
 }
 
-function projectPolygon(points, axis) {
-  const values = points.map((point) => dot(point, axis));
-  return { min: Math.min(...values), max: Math.max(...values) };
+function pointOnSegment(point, start, end) {
+  const epsilon = 0.000001;
+  if (Math.abs(cross(sub(end, start), sub(point, start))) > epsilon) return false;
+  return (
+    point.x >= Math.min(start.x, end.x) - epsilon &&
+    point.x <= Math.max(start.x, end.x) + epsilon &&
+    point.y >= Math.min(start.y, end.y) - epsilon &&
+    point.y <= Math.max(start.y, end.y) + epsilon
+  );
+}
+
+function segmentsIntersect(aStart, aEnd, bStart, bEnd) {
+  const epsilon = 0.000001;
+  const aToBStart = cross(sub(aEnd, aStart), sub(bStart, aStart));
+  const aToBEnd = cross(sub(aEnd, aStart), sub(bEnd, aStart));
+  const bToAStart = cross(sub(bEnd, bStart), sub(aStart, bStart));
+  const bToAEnd = cross(sub(bEnd, bStart), sub(aEnd, bStart));
+  if (aToBStart * aToBEnd < -epsilon && bToAStart * bToAEnd < -epsilon) return true;
+  return (
+    (Math.abs(aToBStart) <= epsilon && pointOnSegment(bStart, aStart, aEnd)) ||
+    (Math.abs(aToBEnd) <= epsilon && pointOnSegment(bEnd, aStart, aEnd)) ||
+    (Math.abs(bToAStart) <= epsilon && pointOnSegment(aStart, bStart, bEnd)) ||
+    (Math.abs(bToAEnd) <= epsilon && pointOnSegment(aEnd, bStart, bEnd))
+  );
 }
 
 function polygonsOverlap(a, b) {
-  const polygons = [a, b];
-  for (const polygon of polygons) {
-    for (let index = 0; index < polygon.length; index += 1) {
-      const current = polygon[index];
-      const next = polygon[(index + 1) % polygon.length];
-      const edge = sub(next, current);
-      const axis = normalize({ x: -edge.y, y: edge.x });
-      const projectionA = projectPolygon(a, axis);
-      const projectionB = projectPolygon(b, axis);
-      if (projectionA.max <= projectionB.min || projectionB.max <= projectionA.min) {
-        return false;
-      }
+  for (let aIndex = 0; aIndex < a.length; aIndex += 1) {
+    const aStart = a[aIndex];
+    const aEnd = a[(aIndex + 1) % a.length];
+    for (let bIndex = 0; bIndex < b.length; bIndex += 1) {
+      const bStart = b[bIndex];
+      const bEnd = b[(bIndex + 1) % b.length];
+      if (segmentsIntersect(aStart, aEnd, bStart, bEnd)) return true;
     }
   }
-  return true;
+  return pointInPolygon(a[0], b) || pointInPolygon(b[0], a);
 }
 
 function getComponentCollisionPolygons(component) {
   const { width, height } = component.size;
+  const post = component.post;
   return [
     transformComponentPolygon(component, rectPolygon(-width / 2, -height / 2, width, height)),
-    transformComponentPolygon(component, rectPolygon(-10, height / 2 - 3, 20, 18)),
+    transformComponentPolygon(
+      component,
+      circlePolygon(post.centerX, post.centerY, post.diameter / 2),
+    ),
   ];
 }
 
@@ -310,7 +379,7 @@ function screwBlockedBySupport(screwPoint) {
 
 function evaluateClamp(component) {
   const clamp = component.clamp;
-  const pivot = localToWorld(component, clamp.pivot);
+  const pivot = localToWorld(component, getPostCenter(component));
   const slotVector = sub(clamp.slotEnd, clamp.slotStart);
   const slotAngleLocal = radToDeg(Math.atan2(slotVector.y, slotVector.x));
   const holes = generateHoles(state.table);
@@ -428,54 +497,46 @@ function autoResolveClampAngles() {
     .forEach(resolveClampAngle);
 }
 
-function makeComponent(kind, options = {}) {
-  const base = {
+function mmPoint(point) {
+  return { x: point.xMm, y: point.yMm };
+}
+
+function makeComponent(definition, options = {}) {
+  const body = definition.geometry.body;
+  const post = definition.geometry.post;
+  const clamp = definition.geometry.clamp;
+  const placement = definition.defaultPlacement ?? {};
+  return {
     id: crypto.randomUUID(),
-    kind,
-    catalogId: options.catalogId ?? null,
+    catalogId: definition.id,
+    name: definition.name,
+    type: definition.type,
+    typeLabel: definition.typeLabel,
+    visualKind: definition.visualKind,
     placementState: options.placementState ?? "placed",
     needsClampResolve: true,
-    position: { x: 105 + state.components.length * 35, y: 120 },
-    rotation: 0,
-    clamp: {
-      pivot: { x: -25, y: 24 },
-      slotStart: { x: 16, y: 0 },
-      slotEnd: { x: 72, y: 0 },
-      rotation: kind === "mirror" ? 20 : -15,
+    position: {
+      x: (placement.xMm ?? 105) + state.components.length * 35,
+      y: placement.yMm ?? 120,
     },
-  };
-
-  if (kind === "source") {
-    return {
-      ...base,
-      name: "光源",
-      position: { x: 70, y: 150 },
-      rotation: 0,
-      clamp: {
-        ...base.clamp,
-        pivot: { x: -24, y: 25 },
-        rotation: 22,
-      },
-      size: { width: 46, height: 28 },
-      optic: "source",
-      wavelengthNm: 650,
-    };
-  }
-
-  if (kind === "lens") {
-    return {
-      ...base,
-      name: "透镜架",
-      size: { width: 34, height: 54 },
-      optic: "lens",
-    };
-  }
-
-  return {
-    ...base,
-    name: "反射镜架",
-    size: { width: 46, height: 38 },
-    optic: "mirror",
+    rotation: placement.rotationDeg ?? 0,
+    size: { width: body.widthMm, height: body.heightMm },
+    post: {
+      centerX: post.centerXmm,
+      centerY: post.centerYmm,
+      diameter: post.diameterMm,
+    },
+    clamp: {
+      width: clamp.widthMm,
+      forkOuterDiameter: clamp.forkOuterDiameterMm,
+      forkClearanceDiameter: clamp.forkClearanceDiameterMm,
+      endLength: clamp.endLengthMm ?? clamp.widthMm / 2,
+      slotStart: { x: clamp.slot.startXmm, y: clamp.slot.startYmm },
+      slotEnd: { x: clamp.slot.endXmm, y: clamp.slot.endYmm },
+      rotation: clamp.defaultRotationDeg,
+    },
+    optics: structuredClone(definition.optics),
+    wavelengthNm: definition.optics.wavelengthNm,
   };
 }
 
@@ -593,17 +654,15 @@ function renderComponent(component) {
     }),
   );
   group.appendChild(
-    createSvg("rect", {
-      class: "mount",
-      x: -10,
-      y: height / 2 - 3,
-      width: 20,
-      height: 18,
-      rx: 2,
+    createSvg("circle", {
+      class: "post",
+      cx: component.post.centerX,
+      cy: component.post.centerY,
+      r: component.post.diameter / 2,
     }),
   );
 
-  if (component.optic === "source") {
+  if (component.visualKind === "source") {
     group.appendChild(
       createSvg("circle", {
         class: "source-aperture",
@@ -618,7 +677,7 @@ function renderComponent(component) {
         d: `M ${-width / 2 + 7} ${-height / 2 + 6} L ${-4} 0 L ${-width / 2 + 7} ${height / 2 - 6} Z`,
       }),
     );
-  } else if (component.optic === "lens") {
+  } else if (component.visualKind === "lens") {
     group.appendChild(
       createSvg("ellipse", {
         class: "optic",
@@ -629,18 +688,28 @@ function renderComponent(component) {
       }),
     );
   } else {
+    const surface = component.optics.surface;
     group.appendChild(
       createSvg("line", {
-        class: "optic",
-        x1: -13,
-        y1: 10,
-        x2: 13,
-        y2: -10,
+        class: "mirror-back",
+        x1: surface.startXmm,
+        y1: surface.startYmm,
+        x2: surface.endXmm,
+        y2: surface.endYmm,
+      }),
+    );
+    group.appendChild(
+      createSvg("line", {
+        class: "mirror-face",
+        x1: surface.startXmm,
+        y1: surface.startYmm,
+        x2: surface.endXmm,
+        y2: surface.endYmm,
       }),
     );
   }
 
-  const pivot = component.clamp.pivot;
+  const pivot = getPostCenter(component);
   group.appendChild(createSvg("circle", { class: "pivot", cx: pivot.x, cy: pivot.y, r: 3 }));
   group.appendChild(
     createSvg("text", {
@@ -674,18 +743,20 @@ function renderActiveClamp() {
 }
 
 function getSourceRay(component) {
+  const sourcePort = component.optics.sourcePort ?? { xMm: component.size.width / 2 + 3, yMm: 0 };
   return {
-    origin: localToWorld(component, { x: component.size.width / 2 + 3, y: 0 }),
+    origin: localToWorld(component, mmPoint(sourcePort)),
     direction: normalize(rotatePoint({ x: 1, y: 0 }, component.rotation)),
     wavelengthNm: component.wavelengthNm ?? 650,
   };
 }
 
-function getMirrorSegment(component) {
+function getInteractionSegment(component) {
+  const surface = component.optics.surface;
   return {
     component,
-    start: localToWorld(component, { x: -13, y: 10 }),
-    end: localToWorld(component, { x: 13, y: -10 }),
+    start: localToWorld(component, { x: surface.startXmm, y: surface.startYmm }),
+    end: localToWorld(component, { x: surface.endXmm, y: surface.endYmm }),
   };
 }
 
@@ -716,10 +787,24 @@ function distanceToTableEdge(origin, direction) {
 }
 
 function applyOpticalInteraction(component, beamState) {
-  if (component.optic === "mirror") {
+  if (component.optics.behavior === "reflect") {
     return {
       ...beamState,
       direction: reflect(beamState.direction, beamState.surfaceDirection),
+    };
+  }
+
+  if (component.optics.behavior === "wavelength-shift") {
+    return {
+      ...beamState,
+      wavelengthNm: component.optics.outputWavelengthNm ?? beamState.wavelengthNm,
+    };
+  }
+
+  if (component.optics.behavior === "absorb") {
+    return {
+      ...beamState,
+      terminated: true,
     };
   }
 
@@ -728,19 +813,19 @@ function applyOpticalInteraction(component, beamState) {
 
 function traceBeam(source) {
   const segments = [];
-  const mirrors = state.components
-    .filter((item) => item.optic === "mirror" && item.placementState === "placed")
-    .map(getMirrorSegment);
+  const interactions = state.components
+    .filter((item) => item.optics.surface && item.placementState === "placed")
+    .map(getInteractionSegment);
   let { origin, direction, wavelengthNm } = getSourceRay(source);
   const usedHits = new Set();
 
   for (let bounce = 0; bounce < 4; bounce += 1) {
-    const hits = mirrors
-      .map((mirror) => ({
-        mirror,
-        hit: raySegmentIntersection(origin, direction, mirror.start, mirror.end),
+    const hits = interactions
+      .map((interaction) => ({
+        interaction,
+        hit: raySegmentIntersection(origin, direction, interaction.start, interaction.end),
       }))
-      .filter((entry) => entry.hit && !usedHits.has(`${entry.mirror.component.id}:${bounce}`))
+      .filter((entry) => entry.hit && !usedHits.has(`${entry.interaction.component.id}:${bounce}`))
       .sort((a, b) => a.hit.rayT - b.hit.rayT);
 
     const nearest = hits[0];
@@ -755,12 +840,13 @@ function traceBeam(source) {
     }
 
     segments.push({ start: origin, end: nearest.hit.point, wavelengthNm });
-    usedHits.add(`${nearest.mirror.component.id}:${bounce}`);
-    const nextBeam = applyOpticalInteraction(nearest.mirror.component, {
+    usedHits.add(`${nearest.interaction.component.id}:${bounce}`);
+    const nextBeam = applyOpticalInteraction(nearest.interaction.component, {
       direction,
       wavelengthNm,
-      surfaceDirection: sub(nearest.mirror.end, nearest.mirror.start),
+      surfaceDirection: sub(nearest.interaction.end, nearest.interaction.start),
     });
+    if (nextBeam.terminated) break;
     direction = nextBeam.direction;
     wavelengthNm = nextBeam.wavelengthNm;
     origin = add(nearest.hit.point, mul(direction, 0.8));
@@ -772,7 +858,7 @@ function traceBeam(source) {
 function renderBeams() {
   const beamGroup = createSvg("g", { class: "beam-layer" });
   state.components
-    .filter((component) => component.optic === "source" && component.placementState === "placed")
+    .filter((component) => component.optics.behavior === "source" && component.placementState === "placed")
     .forEach((source) => {
       traceBeam(source).forEach((segment, index) => {
         const start = worldToScreen(segment.start);
@@ -795,7 +881,7 @@ function renderBeams() {
 
 function renderClamp(component, result, isSelected) {
   const isPending = component.id === state.pendingComponentId;
-  const pivot = localToWorld(component, component.clamp.pivot);
+  const pivot = localToWorld(component, getPostCenter(component));
   const pivotScreen = worldToScreen(pivot);
   const angle = component.rotation + result.effectiveClampRotation;
   const clampGroup = createSvg("g", {
@@ -805,13 +891,9 @@ function renderClamp(component, result, isSelected) {
   });
 
   clampGroup.appendChild(
-    createSvg("rect", {
+    createSvg("path", {
       class: "clamp",
-      x: 8,
-      y: -7,
-      width: 72,
-      height: 14,
-      rx: 3,
+      d: forkClampPath(component.clamp),
     }),
   );
   clampGroup.appendChild(
@@ -851,9 +933,9 @@ function renderInspector() {
   clampRotationValue.textContent = `${Math.round(selected.clamp.rotation)} deg`;
   clampFlex.value = state.maxAutoTurnDeg;
   clampFlexValue.textContent = `${state.maxAutoTurnDeg} deg`;
-  wavelengthControls.hidden = selected.optic !== "source";
-  wavelengthControls.style.display = selected.optic === "source" ? "" : "none";
-  if (selected.optic === "source") {
+  wavelengthControls.hidden = selected.optics.behavior !== "source";
+  wavelengthControls.style.display = selected.optics.behavior === "source" ? "" : "none";
+  if (selected.optics.behavior === "source") {
     wavelengthInput.value = selected.wavelengthNm ?? 650;
     wavelengthValue.textContent = `${selected.wavelengthNm ?? 650} nm`;
   }
@@ -867,7 +949,7 @@ function renderInspector() {
         ? "自动角度：无需调整"
         : `自动角度：${lastAdjustment.toFixed(1)} deg`;
     const warning = result.screwBlocked
-      ? "<br><strong>警告：</strong>螺丝中心被支架挡住，实际安装时可能拧不到。"
+      ? "<br><strong>警告：</strong>螺丝中心被柱子挡住，实际安装时可能拧不到。"
       : "";
     lockStatus.innerHTML = `
       <strong>固定成功</strong><br>
@@ -975,11 +1057,9 @@ function closePicker() {
 }
 
 function addPendingComponent(catalogItem) {
-  const component = makeComponent(catalogItem.kind, {
-    catalogId: catalogItem.id,
+  const component = makeComponent(catalogItem, {
     placementState: "pending",
   });
-  component.name = catalogItem.name;
   component.position = {
     x: state.table.width / 2,
     y: state.table.height / 2,
@@ -1120,7 +1200,7 @@ clampFlex.addEventListener("input", () => {
 
 wavelengthInput.addEventListener("input", () => {
   const selected = getSelected();
-  if (!selected || selected.optic !== "source") return;
+  if (!selected || selected.optics.behavior !== "source") return;
   selected.wavelengthNm = Number(wavelengthInput.value);
   render();
 });
@@ -1170,9 +1250,9 @@ clearAll.addEventListener("click", () => {
   render();
 });
 
-state.components.push(makeComponent("source"));
+state.components.push(makeComponent(catalog.find((item) => item.id === "laser-source")));
 state.components.push({
-  ...makeComponent("mirror"),
+  ...makeComponent(catalog.find((item) => item.id === "mirror-mount")),
   position: { x: 150, y: 150 },
   rotation: 45,
 });

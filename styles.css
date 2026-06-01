@@ -296,7 +296,7 @@ p {
   stroke-width: 1.5;
 }
 
-.mount {
+.post {
   fill: #3d4656;
 }
 
@@ -304,6 +304,21 @@ p {
   fill: #b8e0e4;
   stroke: #167684;
   stroke-width: 1.4;
+}
+
+.mirror-back,
+.mirror-face {
+  stroke-linecap: round;
+}
+
+.mirror-back {
+  stroke: #3d5268;
+  stroke-width: 5.5;
+}
+
+.mirror-face {
+  stroke: #d9fbff;
+  stroke-width: 2.4;
 }
 
 .source-aperture {
