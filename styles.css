@@ -199,11 +199,27 @@ p {
 }
 
 .toolbar #readout {
-  margin-left: auto;
+  margin-left: 4px;
 }
 
 #exportStatus {
   color: #176a76;
+}
+
+.language-control {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+  color: #667085;
+  font-size: 13px;
+}
+
+.language-control select {
+  min-height: 34px;
+  width: auto;
+  padding: 0 28px 0 9px;
 }
 
 .placement-bar {

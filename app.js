@@ -13,6 +13,7 @@ const downloadExportPreview = document.querySelector("#downloadExportPreview");
 const exportPreviewImage = document.querySelector("#exportPreviewImage");
 const exportPreviewFilename = document.querySelector("#exportPreviewFilename");
 const exportPreviewMeta = document.querySelector("#exportPreviewMeta");
+const languageSelect = document.querySelector("#languageSelect");
 const placementBar = document.querySelector("#placementBar");
 const pendingComponentName = document.querySelector("#pendingComponentName");
 const pendingComponentLabel = document.querySelector("#pendingComponentLabel");
@@ -49,6 +50,177 @@ const presets = {
   "450x300": { width: 450, height: 300, pitch: 25, margin: 25 },
   "600x450": { width: 600, height: 450, pitch: 25, margin: 25 },
 };
+const translations = {
+  zh: {
+    documentTitle: "光路图孔位固定原型",
+    brandTitle: "光路图绘制",
+    brandSubtitle: "孔位固定原型",
+    opticalTable: "光学桌",
+    tableSize: "桌面尺寸",
+    table300: "300 x 300 mm 面包板",
+    table450: "450 x 300 mm 面包板",
+    table600: "600 x 450 mm 光学桌",
+    holePitch: "孔距",
+    edgeMargin: "边距",
+    componentLibrary: "元件库",
+    addComponent: "添加元件",
+    selectedComponent: "选中元件",
+    emptyInspector: "点击元件后编辑固定方式",
+    libraryName: "元件库名称：",
+    componentLabel: "元件标签",
+    componentRotation: "元件角度",
+    clampRotation: "压板角度",
+    maxAutoTurn: "最大自动转角",
+    sourceWavelength: "光源波长",
+    mountingRules: "固定规则",
+    mountingRulesText: "拖动元件后压板会自动选择最小转角的可用孔位。压板之间不能重合；螺丝被柱子挡住时仍可固定，但会显示警告。",
+    opticalRules: "光路规则",
+    opticalRulesText: "光源沿元件角度发射光线。光线碰到反射镜后按入射角等于反射角反射；碰到分束立方时同时生成反射与透射分支。",
+    resetView: "重置视图",
+    clearAll: "清空元件",
+    exportSvg: "导出 SVG",
+    exportPng: "导出 PNG",
+    language: "语言",
+    pendingPrefix: "悬置：",
+    pendingHelp: "拖动元件预览孔位与压板位置，确认后再置入光路。",
+    label: "标签",
+    cancel: "取消",
+    place: "置入",
+    canvasLabel: "光学桌画布",
+    pickerTitle: "选择光学元件",
+    pickerSubtitle: "从元件库中选择一个器件加入画布。",
+    close: "关闭",
+    searchComponent: "搜索元件",
+    searchPlaceholder: "输入名称",
+    componentType: "元件类型",
+    allTypes: "全部类型",
+    sourceType: "光源",
+    reflectorType: "反射元件",
+    transmissiveType: "透射元件",
+    beamsplitterType: "分束元件",
+    nothingSelected: "尚未选择元件",
+    confirm: "确定",
+    exportPreviewTitle: "导出预览",
+    downloadFolderHelp: "下载后由浏览器保存到系统默认下载文件夹。",
+    closeExportPreview: "关闭导出预览",
+    exportPreviewAlt: "光路图导出预览",
+    downloadLocal: "下载到本地",
+    thumbnailLabel: "{name} 缩略图",
+    downloaded: "已下载 {filename}",
+    previewReady: "已生成 {filename} 预览",
+    svgFormat: "SVG 矢量图",
+    pngFormat: "PNG 图片",
+    generatingPng: "正在生成 PNG 预览...",
+    pngFailed: "PNG 生成失败",
+    svgFailed: "SVG 生成失败",
+    noAdjustment: "自动角度：无需调整",
+    adjustment: "自动角度：{angle} deg",
+    warningLabel: "警告：",
+    blockedScrew: "螺丝中心被柱子挡住，实际安装时可能拧不到。",
+    mounted: "固定成功",
+    screwHole: "螺丝孔：({x}, {y}) mm",
+    noClampOverlap: "压板没有与其他压板重合。",
+    overlapFailure: "可用孔位会导致压板与其他压板重合。",
+    noHoleFailure: "在 ±{angle} deg 自动转角范围内找不到可用孔位。",
+    mountingFailed: "无法固定",
+    retryMounting: "拖动元件即可重新自动寻找压板角度。",
+    noCatalogResults: "没有符合筛选条件的元件。",
+    selectedCatalog: "已选择：{name} · {type}",
+  },
+  en: {
+    documentTitle: "Optical Layout Mounting Prototype",
+    brandTitle: "Optical Layout",
+    brandSubtitle: "Hole Mounting Prototype",
+    opticalTable: "Optical Table",
+    tableSize: "Table Size",
+    table300: "300 x 300 mm Breadboard",
+    table450: "450 x 300 mm Breadboard",
+    table600: "600 x 450 mm Optical Table",
+    holePitch: "Hole Pitch",
+    edgeMargin: "Edge Margin",
+    componentLibrary: "Component Library",
+    addComponent: "Add Component",
+    selectedComponent: "Selected Component",
+    emptyInspector: "Select a component to edit its mounting",
+    libraryName: "Library name: ",
+    componentLabel: "Component Label",
+    componentRotation: "Component Angle",
+    clampRotation: "Clamp Angle",
+    maxAutoTurn: "Maximum Auto Rotation",
+    sourceWavelength: "Source Wavelength",
+    mountingRules: "Mounting Rules",
+    mountingRulesText: "After dragging a component, the clamp automatically selects an available hole with the smallest rotation. Clamps cannot overlap. A blocked screw is allowed but shown as a warning.",
+    opticalRules: "Optical Rules",
+    opticalRulesText: "Sources emit along the component angle. Mirrors reflect with equal angles of incidence and reflection. Beamsplitter cubes generate reflected and transmitted branches.",
+    resetView: "Reset View",
+    clearAll: "Clear Components",
+    exportSvg: "Export SVG",
+    exportPng: "Export PNG",
+    language: "Language",
+    pendingPrefix: "Pending: ",
+    pendingHelp: "Drag the component to preview the hole and clamp positions, then place it into the layout.",
+    label: "Label",
+    cancel: "Cancel",
+    place: "Place",
+    canvasLabel: "Optical table canvas",
+    pickerTitle: "Select Optical Component",
+    pickerSubtitle: "Choose a component from the library to add it to the canvas.",
+    close: "Close",
+    searchComponent: "Search Components",
+    searchPlaceholder: "Enter a name",
+    componentType: "Component Type",
+    allTypes: "All Types",
+    sourceType: "Source",
+    reflectorType: "Reflective Element",
+    transmissiveType: "Transmissive Element",
+    beamsplitterType: "Beamsplitter",
+    nothingSelected: "No component selected",
+    confirm: "Confirm",
+    exportPreviewTitle: "Export Preview",
+    downloadFolderHelp: "Your browser will save the download to its default downloads folder.",
+    closeExportPreview: "Close export preview",
+    exportPreviewAlt: "Optical layout export preview",
+    downloadLocal: "Download",
+    thumbnailLabel: "{name} thumbnail",
+    downloaded: "Downloaded {filename}",
+    previewReady: "Generated preview for {filename}",
+    svgFormat: "SVG vector image",
+    pngFormat: "PNG image",
+    generatingPng: "Generating PNG preview...",
+    pngFailed: "Failed to generate PNG",
+    svgFailed: "Failed to generate SVG",
+    noAdjustment: "Auto rotation: no adjustment needed",
+    adjustment: "Auto rotation: {angle} deg",
+    warningLabel: "Warning: ",
+    blockedScrew: "The screw center is blocked by a post and may be inaccessible during installation.",
+    mounted: "Mounted",
+    screwHole: "Screw hole: ({x}, {y}) mm",
+    noClampOverlap: "The clamp does not overlap another clamp.",
+    overlapFailure: "Available holes would cause the clamp to overlap another clamp.",
+    noHoleFailure: "No available hole was found within the ±{angle} deg auto-rotation range.",
+    mountingFailed: "Cannot mount",
+    retryMounting: "Drag the component to automatically search for a new clamp angle.",
+    noCatalogResults: "No components match the current filters.",
+    selectedCatalog: "Selected: {name} · {type}",
+  },
+};
+const componentTranslations = {
+  "laser-source": {
+    en: { name: "Ultrastable Mirror Mount Beam Coupler", typeLabel: "Source" },
+  },
+  "mirror-mount": {
+    en: { name: "Ultrastable 1-inch Mirror Mount", typeLabel: "Reflective Element" },
+  },
+  "lens-mount": {
+    en: { name: "Lens Mount", typeLabel: "Transmissive Element" },
+  },
+  waveplate1inch: {
+    en: { name: "1-inch Wave Plate Mount", typeLabel: "Polarization Element" },
+  },
+  "beamsplitter-cube-1inch": {
+    en: { name: "1-inch Beamsplitter Cube", typeLabel: "Beamsplitter" },
+  },
+};
 const publishedLibrary = window.OPTICAL_COMPONENT_LIBRARY;
 if (!publishedLibrary?.components?.length) {
   throw new Error("Published component library is missing or empty.");
@@ -68,7 +240,68 @@ const state = {
   pendingComponentId: null,
   pickerSelectedCatalogId: null,
   exportPreview: null,
+  locale: localStorage.getItem("optical-layout-locale") === "en" ? "en" : "zh",
 };
+
+function t(key, variables = {}) {
+  const template = translations[state.locale][key] ?? translations.zh[key] ?? key;
+  return Object.entries(variables).reduce(
+    (text, [name, value]) => text.replaceAll(`{${name}}`, value),
+    template,
+  );
+}
+
+function getCatalogName(definition) {
+  return componentTranslations[definition.id]?.[state.locale]?.name ?? definition.name;
+}
+
+function getCatalogTypeLabel(definition) {
+  return componentTranslations[definition.id]?.[state.locale]?.typeLabel ?? definition.typeLabel;
+}
+
+function getComponentDefinition(component) {
+  return catalog.find((definition) => definition.id === component.catalogId);
+}
+
+function getComponentLibraryName(component) {
+  const definition = getComponentDefinition(component);
+  return definition ? getCatalogName(definition) : component.name;
+}
+
+function applyStaticTranslations() {
+  document.documentElement.lang = state.locale === "en" ? "en" : "zh-CN";
+  document.title = t("documentTitle");
+  languageSelect.value = state.locale;
+  document.querySelectorAll("[data-i18n]").forEach((node) => {
+    node.textContent = t(node.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-aria-label]").forEach((node) => {
+    node.setAttribute("aria-label", t(node.dataset.i18nAriaLabel));
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
+    node.setAttribute("placeholder", t(node.dataset.i18nPlaceholder));
+  });
+  document.querySelectorAll("[data-i18n-alt]").forEach((node) => {
+    node.setAttribute("alt", t(node.dataset.i18nAlt));
+  });
+}
+
+function setLocale(locale) {
+  state.locale = locale === "en" ? "en" : "zh";
+  localStorage.setItem("optical-layout-locale", state.locale);
+  state.components.forEach((component) => {
+    if (!component.labelIsDefault) return;
+    component.label = getComponentLibraryName(component);
+  });
+  exportStatus.textContent = "";
+  applyStaticTranslations();
+  if (!componentPicker.hidden) renderComponentCatalog();
+  if (state.exportPreview) {
+    exportPreviewMeta.textContent =
+      `${t(state.exportPreview.formatKey)} · ${(state.exportPreview.blob.size / 1024).toFixed(1)} KB`;
+  }
+  render();
+}
 
 function createSvg(tag, attrs = {}) {
   const node = document.createElementNS(NS, tag);
@@ -531,11 +764,13 @@ function makeComponent(definition, options = {}) {
   const post = definition.geometry.post;
   const clamp = definition.geometry.clamp;
   const placement = definition.defaultPlacement ?? {};
+  const localizedName = getCatalogName(definition);
   return {
     id: crypto.randomUUID(),
     catalogId: definition.id,
     name: definition.name,
-    label: definition.name,
+    label: localizedName,
+    labelIsDefault: true,
     type: definition.type,
     typeLabel: definition.typeLabel,
     visualKind: definition.visualKind,
@@ -602,7 +837,7 @@ function createCatalogThumbnail(definition) {
     viewBox: `${bounds.minX} ${bounds.minY} ${bounds.width} ${bounds.height}`,
     preserveAspectRatio: "xMidYMid meet",
     role: "img",
-    "aria-label": `${definition.name} 缩略图`,
+    "aria-label": t("thumbnailLabel", { name: getCatalogName(definition) }),
   });
   const clampGroup = createSvg("g", {
     transform: `translate(${pivot.x} ${pivot.y}) rotate(${component.clamp.rotation})`,
@@ -754,7 +989,7 @@ function downloadBlob(filename, blob) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
-  exportStatus.textContent = `已下载 ${filename}`;
+  exportStatus.textContent = t("downloaded", { filename });
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
@@ -766,22 +1001,22 @@ function closeExportDialog() {
   exportPreview.hidden = true;
 }
 
-function openExportDialog(filename, blob, format) {
+function openExportDialog(filename, blob, formatKey) {
   if (state.exportPreview?.url) URL.revokeObjectURL(state.exportPreview.url);
   const url = URL.createObjectURL(blob);
-  state.exportPreview = { filename, blob, url };
+  state.exportPreview = { filename, blob, url, formatKey };
   exportPreviewFilename.textContent = filename;
-  exportPreviewMeta.textContent = `${format} · ${(blob.size / 1024).toFixed(1)} KB`;
+  exportPreviewMeta.textContent = `${t(formatKey)} · ${(blob.size / 1024).toFixed(1)} KB`;
   exportPreviewImage.src = url;
   exportPreview.hidden = false;
-  exportStatus.textContent = `已生成 ${filename} 预览`;
+  exportStatus.textContent = t("previewReady", { filename });
 }
 
 function previewSvg() {
   openExportDialog(
     "optical-layout.svg",
     new Blob([createExportSvgMarkup()], { type: "image/svg+xml;charset=utf-8" }),
-    "SVG 矢量图",
+    "svgFormat",
   );
 }
 
@@ -809,12 +1044,12 @@ async function createExportPngBlob() {
 }
 
 async function previewPng() {
-  exportStatus.textContent = "正在生成 PNG 预览...";
+  exportStatus.textContent = t("generatingPng");
   try {
     const blob = await createExportPngBlob();
-    if (blob) openExportDialog("optical-layout.png", blob, "PNG 图片");
+    if (blob) openExportDialog("optical-layout.png", blob, "pngFormat");
   } catch {
-    exportStatus.textContent = "PNG 生成失败";
+    exportStatus.textContent = t("pngFailed");
   }
 }
 
@@ -1268,7 +1503,7 @@ function renderInspector() {
   emptyState.hidden = Boolean(selected);
   if (!selected) return;
 
-  componentLibraryName.textContent = selected.name;
+  componentLibraryName.textContent = getComponentLibraryName(selected);
   componentLabel.value = selected.label ?? selected.name;
   componentRotation.value = selected.rotation;
   componentRotationNumber.value = Math.round(selected.rotation);
@@ -1290,25 +1525,25 @@ function renderInspector() {
     const lastAdjustment = selected.lastClampAdjustmentDeg ?? result.angleDelta;
     const adjustment =
       Math.abs(lastAdjustment) < 0.1
-        ? "自动角度：无需调整"
-        : `自动角度：${lastAdjustment.toFixed(1)} deg`;
+        ? t("noAdjustment")
+        : t("adjustment", { angle: lastAdjustment.toFixed(1) });
     const warning = result.screwBlocked
-      ? "<br><strong>警告：</strong>螺丝中心被柱子挡住，实际安装时可能拧不到。"
+      ? `<br><strong>${t("warningLabel")}</strong>${t("blockedScrew")}`
       : "";
     lockStatus.innerHTML = `
-      <strong>固定成功</strong><br>
-      螺丝孔：(${result.candidate.x.toFixed(0)}, ${result.candidate.y.toFixed(0)}) mm<br>
+      <strong>${t("mounted")}</strong><br>
+      ${t("screwHole", { x: result.candidate.x.toFixed(0), y: result.candidate.y.toFixed(0) })}<br>
       ${adjustment}<br>
-      压板没有与其他压板重合。${warning}
+      ${t("noClampOverlap")}${warning}
     `;
   } else {
     const reason = result.blockedByClampOverlap
-      ? "可用孔位会导致压板与其他压板重合。"
-      : `在 ±${state.maxAutoTurnDeg} deg 自动转角范围内找不到可用孔位。`;
+      ? t("overlapFailure")
+      : t("noHoleFailure", { angle: state.maxAutoTurnDeg });
     lockStatus.innerHTML = `
-      <strong>无法固定</strong><br>
+      <strong>${t("mountingFailed")}</strong><br>
       ${reason}<br>
-      拖动元件即可重新自动寻找压板角度。
+      ${t("retryMounting")}
     `;
   }
 }
@@ -1320,7 +1555,7 @@ function renderPlacementUi() {
   if (!pending) return;
 
   const result = getStoredClampResult(pending);
-  pendingComponentName.textContent = pending.name;
+  pendingComponentName.textContent = getComponentLibraryName(pending);
   pendingComponentLabel.value = pending.label ?? pending.name;
   confirmPlacement.disabled = !result.valid;
 }
@@ -1350,9 +1585,13 @@ function renderComponentCatalog() {
   const query = componentSearch.value.trim().toLowerCase();
   const type = componentTypeFilter.value;
   const filteredCatalog = catalog.filter((item) => {
+    const localizedName = getCatalogName(item).toLowerCase();
+    const localizedTypeLabel = getCatalogTypeLabel(item).toLowerCase();
     const matchesType = type === "all" || item.type === type;
     const matchesQuery =
       query === "" ||
+      localizedName.includes(query) ||
+      localizedTypeLabel.includes(query) ||
       item.name.toLowerCase().includes(query) ||
       item.typeLabel.toLowerCase().includes(query);
     return matchesType && matchesQuery;
@@ -1365,9 +1604,9 @@ function renderComponentCatalog() {
     button.className = `catalog-item${item.id === state.pickerSelectedCatalogId ? " selected" : ""}`;
     button.dataset.catalogId = item.id;
     const name = document.createElement("strong");
-    name.textContent = item.name;
+    name.textContent = getCatalogName(item);
     const typeLabel = document.createElement("span");
-    typeLabel.textContent = item.typeLabel;
+    typeLabel.textContent = getCatalogTypeLabel(item);
     button.append(createCatalogThumbnail(item), name, typeLabel);
     componentCatalog.appendChild(button);
   });
@@ -1375,14 +1614,17 @@ function renderComponentCatalog() {
   if (filteredCatalog.length === 0) {
     const empty = document.createElement("p");
     empty.className = "empty";
-    empty.textContent = "没有符合筛选条件的元件。";
+    empty.textContent = t("noCatalogResults");
     componentCatalog.appendChild(empty);
   }
 
   const selectedItem = catalog.find((item) => item.id === state.pickerSelectedCatalogId);
   pickerSelectionSummary.textContent = selectedItem
-    ? `已选择：${selectedItem.name} · ${selectedItem.typeLabel}`
-    : "尚未选择元件";
+    ? t("selectedCatalog", {
+        name: getCatalogName(selectedItem),
+        type: getCatalogTypeLabel(selectedItem),
+      })
+    : t("nothingSelected");
   confirmComponentPicker.disabled = !selectedItem;
 }
 
@@ -1512,6 +1754,7 @@ pendingComponentLabel.addEventListener("input", () => {
   const pending = state.components.find((component) => component.id === state.pendingComponentId);
   if (!pending) return;
   pending.label = pendingComponentLabel.value;
+  pending.labelIsDefault = false;
   componentLabel.value = pending.label;
   updateRenderedLabel(pending);
 });
@@ -1520,6 +1763,7 @@ componentLabel.addEventListener("input", () => {
   const selected = getSelected();
   if (!selected) return;
   selected.label = componentLabel.value;
+  selected.labelIsDefault = false;
   if (selected.id === state.pendingComponentId) pendingComponentLabel.value = selected.label;
   updateRenderedLabel(selected);
 });
@@ -1616,7 +1860,7 @@ exportSvg.addEventListener("click", () => {
   try {
     previewSvg();
   } catch {
-    exportStatus.textContent = "SVG 生成失败";
+    exportStatus.textContent = t("svgFailed");
   }
 });
 exportPng.addEventListener("click", previewPng);
@@ -1629,7 +1873,11 @@ downloadExportPreview.addEventListener("click", () => {
   if (!state.exportPreview) return;
   downloadBlob(state.exportPreview.filename, state.exportPreview.blob);
 });
+languageSelect.addEventListener("change", () => {
+  setLocale(languageSelect.value);
+});
 
+applyStaticTranslations();
 state.components.push(makeComponent(catalog.find((item) => item.id === "laser-source")));
 state.components.push({
   ...makeComponent(catalog.find((item) => item.id === "mirror-mount")),

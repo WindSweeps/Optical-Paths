@@ -4,50 +4,50 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>光路图孔位固定原型</title>
-    <link rel="stylesheet" href="./styles.css?v=7" />
+    <link rel="stylesheet" href="./styles.css?v=8" />
   </head>
   <body>
     <main class="app">
       <aside class="sidebar">
         <div class="brand">
-          <strong>光路图绘制</strong>
-          <span>孔位固定原型</span>
+          <strong data-i18n="brandTitle">光路图绘制</strong>
+          <span data-i18n="brandSubtitle">孔位固定原型</span>
         </div>
 
         <section>
-          <h2>光学桌</h2>
+          <h2 data-i18n="opticalTable">光学桌</h2>
           <label>
-            桌面尺寸
+            <span data-i18n="tableSize">桌面尺寸</span>
             <select id="tablePreset">
-              <option value="300x300">300 x 300 mm 面包板</option>
-              <option value="450x300">450 x 300 mm 面包板</option>
-              <option value="600x450">600 x 450 mm 光学桌</option>
+              <option value="300x300" data-i18n="table300">300 x 300 mm 面包板</option>
+              <option value="450x300" data-i18n="table450">450 x 300 mm 面包板</option>
+              <option value="600x450" data-i18n="table600">600 x 450 mm 光学桌</option>
             </select>
           </label>
           <div class="meta-grid">
-            <span>孔距</span><strong>25 mm</strong>
-            <span>边距</span><strong>25 mm</strong>
+            <span data-i18n="holePitch">孔距</span><strong>25 mm</strong>
+            <span data-i18n="edgeMargin">边距</span><strong>25 mm</strong>
           </div>
         </section>
 
         <section>
-          <h2>元件库</h2>
-          <button id="openComponentPicker" class="primary-button" type="button">添加元件</button>
+          <h2 data-i18n="componentLibrary">元件库</h2>
+          <button id="openComponentPicker" class="primary-button" type="button" data-i18n="addComponent">添加元件</button>
         </section>
 
         <section>
-          <h2>选中元件</h2>
-          <div id="emptyState" class="empty">点击元件后编辑固定方式</div>
+          <h2 data-i18n="selectedComponent">选中元件</h2>
+          <div id="emptyState" class="empty" data-i18n="emptyInspector">点击元件后编辑固定方式</div>
           <div id="inspector" class="inspector" hidden>
             <div class="component-library-name">
-              元件库名称：<strong id="componentLibraryName"></strong>
+              <span data-i18n="libraryName">元件库名称：</span><strong id="componentLibraryName"></strong>
             </div>
             <label>
-              元件标签
+              <span data-i18n="componentLabel">元件标签</span>
               <input id="componentLabel" type="text" />
             </label>
             <label>
-              元件角度
+              <span data-i18n="componentRotation">元件角度</span>
               <div class="input-row">
                 <input id="componentRotation" type="range" min="-180" max="180" value="0" />
                 <input id="componentRotationNumber" type="number" min="-180" max="180" step="1" value="0" />
@@ -55,17 +55,17 @@
               <output id="componentRotationValue">0 deg</output>
             </label>
             <label>
-              压板角度
+              <span data-i18n="clampRotation">压板角度</span>
               <input id="clampRotation" type="range" min="-180" max="180" value="0" />
               <output id="clampRotationValue">0 deg</output>
             </label>
             <label>
-              最大自动转角
+              <span data-i18n="maxAutoTurn">最大自动转角</span>
               <input id="clampFlex" type="range" min="0" max="180" value="180" />
               <output id="clampFlexValue">180 deg</output>
             </label>
             <label id="wavelengthControls" hidden>
-              光源波长
+              <span data-i18n="sourceWavelength">光源波长</span>
               <input id="wavelengthInput" type="number" min="200" max="2000" step="1" value="650" />
               <output id="wavelengthValue">650 nm</output>
             </label>
@@ -74,44 +74,51 @@
         </section>
 
         <section>
-          <h2>固定规则</h2>
-          <p>
+          <h2 data-i18n="mountingRules">固定规则</h2>
+          <p data-i18n="mountingRulesText">
             拖动元件后压板会自动选择最小转角的可用孔位。压板之间不能重合；螺丝被柱子挡住时仍可固定，但会显示警告。
           </p>
         </section>
 
         <section>
-          <h2>反射规则</h2>
-          <p>
-            光源沿元件角度发射光线。光线碰到反射镜线段后，按照入射角等于反射角自动生成下一段。
+          <h2 data-i18n="opticalRules">光路规则</h2>
+          <p data-i18n="opticalRulesText">
+            光源沿元件角度发射光线。光线碰到反射镜后按入射角等于反射角反射；碰到分束立方时同时生成反射与透射分支。
           </p>
         </section>
       </aside>
 
       <section class="workspace">
         <div class="toolbar">
-          <button id="resetView" type="button">重置视图</button>
-          <button id="clearAll" type="button">清空元件</button>
-          <button id="exportSvg" type="button">导出 SVG</button>
-          <button id="exportPng" type="button">导出 PNG</button>
+          <button id="resetView" type="button" data-i18n="resetView">重置视图</button>
+          <button id="clearAll" type="button" data-i18n="clearAll">清空元件</button>
+          <button id="exportSvg" type="button" data-i18n="exportSvg">导出 SVG</button>
+          <button id="exportPng" type="button" data-i18n="exportPng">导出 PNG</button>
           <span id="exportStatus" role="status"></span>
+          <label class="language-control">
+            <span data-i18n="language">语言</span>
+            <select id="languageSelect" data-i18n-aria-label="language">
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+            </select>
+          </label>
           <span id="readout">1 px = 1 mm</span>
         </div>
         <div id="placementBar" class="placement-bar" hidden>
           <span class="placement-indicator"></span>
           <div>
-            <strong>悬置：<span id="pendingComponentName"></span></strong>
-            <small>拖动元件预览孔位与压板位置，确认后再置入光路。</small>
+            <strong><span data-i18n="pendingPrefix">悬置：</span><span id="pendingComponentName"></span></strong>
+            <small data-i18n="pendingHelp">拖动元件预览孔位与压板位置，确认后再置入光路。</small>
           </div>
           <label class="placement-label">
-            标签
+            <span data-i18n="label">标签</span>
             <input id="pendingComponentLabel" type="text" />
           </label>
-          <button id="cancelPlacement" type="button">取消</button>
-          <button id="confirmPlacement" class="primary-button" type="button">置入</button>
+          <button id="cancelPlacement" type="button" data-i18n="cancel">取消</button>
+          <button id="confirmPlacement" class="primary-button" type="button" data-i18n="place">置入</button>
         </div>
         <div class="canvas-shell">
-          <svg id="canvas" aria-label="光学桌画布"></svg>
+          <svg id="canvas" aria-label="光学桌画布" data-i18n-aria-label="canvasLabel"></svg>
         </div>
       </section>
     </main>
@@ -120,32 +127,32 @@
       <div class="picker-dialog" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
         <header class="picker-header">
           <div>
-            <h1 id="pickerTitle">选择光学元件</h1>
-            <p>从元件库中选择一个器件加入画布。</p>
+            <h1 id="pickerTitle" data-i18n="pickerTitle">选择光学元件</h1>
+            <p data-i18n="pickerSubtitle">从元件库中选择一个器件加入画布。</p>
           </div>
-          <button id="closeComponentPicker" class="icon-button" type="button" aria-label="关闭">×</button>
+          <button id="closeComponentPicker" class="icon-button" type="button" aria-label="关闭" data-i18n-aria-label="close">×</button>
         </header>
         <div class="picker-toolbar">
           <label>
-            搜索元件
-            <input id="componentSearch" type="search" placeholder="输入名称" />
+            <span data-i18n="searchComponent">搜索元件</span>
+            <input id="componentSearch" type="search" placeholder="输入名称" data-i18n-placeholder="searchPlaceholder" />
           </label>
           <label>
-            元件类型
+            <span data-i18n="componentType">元件类型</span>
             <select id="componentTypeFilter">
-              <option value="all">全部类型</option>
-              <option value="source">光源</option>
-              <option value="reflector">反射元件</option>
-              <option value="transmissive">透射元件</option>
-              <option value="beamsplitter">分束元件</option>
+              <option value="all" data-i18n="allTypes">全部类型</option>
+              <option value="source" data-i18n="sourceType">光源</option>
+              <option value="reflector" data-i18n="reflectorType">反射元件</option>
+              <option value="transmissive" data-i18n="transmissiveType">透射元件</option>
+              <option value="beamsplitter" data-i18n="beamsplitterType">分束元件</option>
             </select>
           </label>
         </div>
         <div id="componentCatalog" class="component-catalog"></div>
         <footer class="picker-footer">
-          <span id="pickerSelectionSummary">尚未选择元件</span>
-          <button id="cancelComponentPicker" type="button">取消</button>
-          <button id="confirmComponentPicker" class="primary-button" type="button" disabled>确定</button>
+          <span id="pickerSelectionSummary" data-i18n="nothingSelected">尚未选择元件</span>
+          <button id="cancelComponentPicker" type="button" data-i18n="cancel">取消</button>
+          <button id="confirmComponentPicker" class="primary-button" type="button" disabled data-i18n="confirm">确定</button>
         </footer>
       </div>
     </div>
@@ -154,26 +161,26 @@
       <div class="export-dialog" role="dialog" aria-modal="true" aria-labelledby="exportPreviewTitle">
         <header class="picker-header">
           <div>
-            <h1 id="exportPreviewTitle">导出预览</h1>
-            <p>下载后由浏览器保存到系统默认下载文件夹。</p>
+            <h1 id="exportPreviewTitle" data-i18n="exportPreviewTitle">导出预览</h1>
+            <p data-i18n="downloadFolderHelp">下载后由浏览器保存到系统默认下载文件夹。</p>
           </div>
-          <button id="closeExportPreview" class="icon-button" type="button" aria-label="关闭导出预览">×</button>
+          <button id="closeExportPreview" class="icon-button" type="button" aria-label="关闭导出预览" data-i18n-aria-label="closeExportPreview">×</button>
         </header>
         <div class="export-preview-stage">
-          <img id="exportPreviewImage" alt="光路图导出预览" />
+          <img id="exportPreviewImage" alt="光路图导出预览" data-i18n-alt="exportPreviewAlt" />
         </div>
         <footer class="export-footer">
           <div>
             <strong id="exportPreviewFilename"></strong>
             <span id="exportPreviewMeta"></span>
           </div>
-          <button id="cancelExportPreview" type="button">取消</button>
-          <button id="downloadExportPreview" class="primary-button" type="button">下载到本地</button>
+          <button id="cancelExportPreview" type="button" data-i18n="cancel">取消</button>
+          <button id="downloadExportPreview" class="primary-button" type="button" data-i18n="downloadLocal">下载到本地</button>
         </footer>
       </div>
     </div>
 
     <script src="./component-library.js?v=8"></script>
-    <script src="./app.js?v=25"></script>
+    <script src="./app.js?v=26"></script>
   </body>
 </html>
