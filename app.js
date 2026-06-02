@@ -6,6 +6,13 @@ const clearAll = document.querySelector("#clearAll");
 const exportSvg = document.querySelector("#exportSvg");
 const exportPng = document.querySelector("#exportPng");
 const exportStatus = document.querySelector("#exportStatus");
+const exportPreview = document.querySelector("#exportPreview");
+const closeExportPreview = document.querySelector("#closeExportPreview");
+const cancelExportPreview = document.querySelector("#cancelExportPreview");
+const downloadExportPreview = document.querySelector("#downloadExportPreview");
+const exportPreviewImage = document.querySelector("#exportPreviewImage");
+const exportPreviewFilename = document.querySelector("#exportPreviewFilename");
+const exportPreviewMeta = document.querySelector("#exportPreviewMeta");
 const placementBar = document.querySelector("#placementBar");
 const pendingComponentName = document.querySelector("#pendingComponentName");
 const pendingComponentLabel = document.querySelector("#pendingComponentLabel");
@@ -46,10 +53,7 @@ const publishedLibrary = window.OPTICAL_COMPONENT_LIBRARY;
 if (!publishedLibrary?.components?.length) {
   throw new Error("Published component library is missing or empty.");
 }
-const catalog = publishedLibrary.components.map((component) => ({
-  ...component,
-  thumbnailClass: `thumbnail-${component.visualKind}`,
-}));
+const catalog = publishedLibrary.components;
 
 const state = {
   table: presets["300x300"],
@@ -63,6 +67,7 @@ const state = {
   suppressNextClick: false,
   pendingComponentId: null,
   pickerSelectedCatalogId: null,
+  exportPreview: null,
 };
 
 function createSvg(tag, attrs = {}) {
@@ -561,6 +566,134 @@ function makeComponent(definition, options = {}) {
   };
 }
 
+function getCatalogThumbnailBounds(component) {
+  const { width, height } = component.size;
+  const pivot = getPostCenter(component);
+  const clampRotation = component.clamp.rotation;
+  const clampPoints = forkClampPolygon(component.clamp).map((point) =>
+    add(pivot, rotatePoint(point, clampRotation)),
+  );
+  const screw = add(pivot, rotatePoint(component.clamp.slotEnd, clampRotation));
+  const points = [
+    ...rectPolygon(-width / 2, -height / 2, width, height),
+    ...circlePolygon(pivot.x, pivot.y, component.post.diameter / 2),
+    ...clampPoints,
+    { x: screw.x - 5, y: screw.y - 5 },
+    { x: screw.x + 5, y: screw.y + 5 },
+  ];
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const padding = 7;
+  const minX = Math.min(...xs) - padding;
+  const minY = Math.min(...ys) - padding;
+  const maxX = Math.max(...xs) + padding;
+  const maxY = Math.max(...ys) + padding;
+  return { minX, minY, width: maxX - minX, height: maxY - minY };
+}
+
+function createCatalogThumbnail(definition) {
+  const component = makeComponent(definition);
+  component.position = { x: 0, y: 0 };
+  component.rotation = 0;
+  const bounds = getCatalogThumbnailBounds(component);
+  const pivot = getPostCenter(component);
+  const thumbnail = createSvg("svg", {
+    class: "catalog-thumbnail",
+    viewBox: `${bounds.minX} ${bounds.minY} ${bounds.width} ${bounds.height}`,
+    preserveAspectRatio: "xMidYMid meet",
+    role: "img",
+    "aria-label": `${definition.name} 缩略图`,
+  });
+  const clampGroup = createSvg("g", {
+    transform: `translate(${pivot.x} ${pivot.y}) rotate(${component.clamp.rotation})`,
+  });
+  clampGroup.appendChild(createSvg("path", {
+    class: "clamp",
+    d: forkClampPath(component.clamp),
+  }));
+  clampGroup.appendChild(createSvg("line", {
+    class: "slot",
+    x1: component.clamp.slotStart.x,
+    y1: component.clamp.slotStart.y,
+    x2: component.clamp.slotEnd.x,
+    y2: component.clamp.slotEnd.y,
+  }));
+  clampGroup.appendChild(createSvg("circle", {
+    class: "screw",
+    cx: component.clamp.slotEnd.x,
+    cy: component.clamp.slotEnd.y,
+    r: 4,
+  }));
+  thumbnail.appendChild(clampGroup);
+
+  const { width, height } = component.size;
+  thumbnail.appendChild(createSvg("rect", {
+    class: "component-body",
+    x: -width / 2,
+    y: -height / 2,
+    width,
+    height,
+    rx: 3,
+  }));
+  thumbnail.appendChild(createSvg("circle", {
+    class: "post",
+    cx: pivot.x,
+    cy: pivot.y,
+    r: component.post.diameter / 2,
+  }));
+
+  if (component.visualKind === "source") {
+    thumbnail.appendChild(createSvg("circle", {
+      class: "source-aperture",
+      cx: width / 2,
+      cy: 0,
+      r: 5,
+    }));
+    thumbnail.appendChild(createSvg("path", {
+      class: "source-symbol",
+      d: "M -12 -4 L -4 0 L -12 4 Z",
+    }));
+  } else if (component.visualKind === "lens") {
+    thumbnail.appendChild(createSvg("ellipse", {
+      class: "optic",
+      ...getLensEllipseGeometry(component.optics.surface),
+    }));
+  } else if (component.visualKind === "beamsplitter") {
+    const surface = component.optics.surface;
+    thumbnail.appendChild(createSvg("line", {
+      class: "splitter-face",
+      x1: surface.startXmm,
+      y1: surface.startYmm,
+      x2: surface.endXmm,
+      y2: surface.endYmm,
+    }));
+  } else {
+    const surface = component.optics.surface;
+    thumbnail.appendChild(createSvg("line", {
+      class: "mirror-back",
+      x1: surface.startXmm,
+      y1: surface.startYmm,
+      x2: surface.endXmm,
+      y2: surface.endYmm,
+    }));
+    thumbnail.appendChild(createSvg("line", {
+      class: "mirror-face",
+      x1: surface.startXmm,
+      y1: surface.startYmm,
+      x2: surface.endXmm,
+      y2: surface.endYmm,
+    }));
+  }
+
+  thumbnail.appendChild(createSvg("circle", {
+    class: "pivot",
+    cx: pivot.x,
+    cy: pivot.y,
+    r: 3,
+  }));
+  return thumbnail;
+}
+
 function clearSvg() {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 }
@@ -621,15 +754,34 @@ function downloadBlob(filename, blob) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
-  exportStatus.textContent = `已生成 ${filename}`;
+  exportStatus.textContent = `已下载 ${filename}`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-function downloadSvg() {
-  downloadBlob(
+function closeExportDialog() {
+  if (state.exportPreview?.url) URL.revokeObjectURL(state.exportPreview.url);
+  state.exportPreview = null;
+  exportPreviewImage.removeAttribute("src");
+  exportPreview.hidden = true;
+}
+
+function openExportDialog(filename, blob, format) {
+  if (state.exportPreview?.url) URL.revokeObjectURL(state.exportPreview.url);
+  const url = URL.createObjectURL(blob);
+  state.exportPreview = { filename, blob, url };
+  exportPreviewFilename.textContent = filename;
+  exportPreviewMeta.textContent = `${format} · ${(blob.size / 1024).toFixed(1)} KB`;
+  exportPreviewImage.src = url;
+  exportPreview.hidden = false;
+  exportStatus.textContent = `已生成 ${filename} 预览`;
+}
+
+function previewSvg() {
+  openExportDialog(
     "optical-layout.svg",
     new Blob([createExportSvgMarkup()], { type: "image/svg+xml;charset=utf-8" }),
+    "SVG 矢量图",
   );
 }
 
@@ -656,11 +808,11 @@ async function createExportPngBlob() {
   }
 }
 
-async function downloadPng() {
-  exportStatus.textContent = "正在生成 PNG...";
+async function previewPng() {
+  exportStatus.textContent = "正在生成 PNG 预览...";
   try {
     const blob = await createExportPngBlob();
-    if (blob) downloadBlob("optical-layout.png", blob);
+    if (blob) openExportDialog("optical-layout.png", blob, "PNG 图片");
   } catch {
     exportStatus.textContent = "PNG 生成失败";
   }
@@ -1212,11 +1364,11 @@ function renderComponentCatalog() {
     button.type = "button";
     button.className = `catalog-item${item.id === state.pickerSelectedCatalogId ? " selected" : ""}`;
     button.dataset.catalogId = item.id;
-    button.innerHTML = `
-      <div class="catalog-thumbnail ${item.thumbnailClass}"></div>
-      <strong>${item.name}</strong>
-      <span>${item.typeLabel}</span>
-    `;
+    const name = document.createElement("strong");
+    name.textContent = item.name;
+    const typeLabel = document.createElement("span");
+    typeLabel.textContent = item.typeLabel;
+    button.append(createCatalogThumbnail(item), name, typeLabel);
     componentCatalog.appendChild(button);
   });
 
@@ -1444,6 +1596,7 @@ componentPicker.addEventListener("click", (event) => {
 });
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !componentPicker.hidden) closePicker();
+  if (event.key === "Escape" && !exportPreview.hidden) closeExportDialog();
 });
 
 resetView.addEventListener("click", () => {
@@ -1461,12 +1614,21 @@ clearAll.addEventListener("click", () => {
 
 exportSvg.addEventListener("click", () => {
   try {
-    downloadSvg();
+    previewSvg();
   } catch {
     exportStatus.textContent = "SVG 生成失败";
   }
 });
-exportPng.addEventListener("click", downloadPng);
+exportPng.addEventListener("click", previewPng);
+closeExportPreview.addEventListener("click", closeExportDialog);
+cancelExportPreview.addEventListener("click", closeExportDialog);
+exportPreview.addEventListener("click", (event) => {
+  if (event.target === exportPreview) closeExportDialog();
+});
+downloadExportPreview.addEventListener("click", () => {
+  if (!state.exportPreview) return;
+  downloadBlob(state.exportPreview.filename, state.exportPreview.blob);
+});
 
 state.components.push(makeComponent(catalog.find((item) => item.id === "laser-source")));
 state.components.push({

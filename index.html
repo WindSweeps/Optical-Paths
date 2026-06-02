@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>光路图孔位固定原型</title>
-    <link rel="stylesheet" href="./styles.css?v=5" />
+    <link rel="stylesheet" href="./styles.css?v=7" />
   </head>
   <body>
     <main class="app">
@@ -150,7 +150,30 @@
       </div>
     </div>
 
+    <div id="exportPreview" class="modal-backdrop" hidden>
+      <div class="export-dialog" role="dialog" aria-modal="true" aria-labelledby="exportPreviewTitle">
+        <header class="picker-header">
+          <div>
+            <h1 id="exportPreviewTitle">导出预览</h1>
+            <p>下载后由浏览器保存到系统默认下载文件夹。</p>
+          </div>
+          <button id="closeExportPreview" class="icon-button" type="button" aria-label="关闭导出预览">×</button>
+        </header>
+        <div class="export-preview-stage">
+          <img id="exportPreviewImage" alt="光路图导出预览" />
+        </div>
+        <footer class="export-footer">
+          <div>
+            <strong id="exportPreviewFilename"></strong>
+            <span id="exportPreviewMeta"></span>
+          </div>
+          <button id="cancelExportPreview" type="button">取消</button>
+          <button id="downloadExportPreview" class="primary-button" type="button">下载到本地</button>
+        </footer>
+      </div>
+    </div>
+
     <script src="./component-library.js?v=8"></script>
-    <script src="./app.js?v=23"></script>
+    <script src="./app.js?v=25"></script>
   </body>
 </html>
