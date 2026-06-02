@@ -116,40 +116,142 @@ window.OPTICAL_COMPONENT_LIBRARY = {
       },
       "geometry": {
         "body": {
-          "widthMm": 34,
-          "heightMm": 54
+          "widthMm": 10.2,
+          "heightMm": 30.5
         },
         "clamp": {
           "slot": {
-            "startXmm": 16,
+            "startXmm": 27,
             "startYmm": 0,
-            "endXmm": 72,
+            "endXmm": 59,
             "endYmm": 0
           },
           "defaultRotationDeg": -15,
-          "widthMm": 28,
-          "forkOuterDiameterMm": 53.4,
-          "forkClearanceDiameterMm": 24,
-          "endLengthMm": 14
+          "widthMm": 18,
+          "forkOuterDiameterMm": 32.8,
+          "forkClearanceDiameterMm": 25,
+          "endLengthMm": 13
         },
         "post": {
-          "centerXmm": 10,
-          "centerYmm": 9,
-          "diameterMm": 20
+          "centerXmm": 0,
+          "centerYmm": 0,
+          "diameterMm": 25
         }
       },
       "optics": {
         "behavior": "transmit",
         "surface": {
           "startXmm": 0,
-          "startYmm": -21,
+          "startYmm": 12.7,
           "endXmm": 0,
-          "endYmm": 21
+          "endYmm": -12.7
         },
         "wavelengthNm": 650,
         "sourcePort": {
           "xMm": 23,
           "yMm": 0
+        },
+        "outputWavelengthNm": 532
+      }
+    },
+    {
+      "id": "waveplate1inch",
+      "name": "一英寸波片架",
+      "type": "modulator",
+      "typeLabel": "偏振元件",
+      "visualKind": "mirror",
+      "defaultPlacement": {
+        "xMm": 105,
+        "yMm": 120,
+        "rotationDeg": 0
+      },
+      "geometry": {
+        "body": {
+          "widthMm": 12.7,
+          "heightMm": 54
+        },
+        "post": {
+          "centerXmm": -1.6,
+          "centerYmm": 0,
+          "diameterMm": 25
+        },
+        "clamp": {
+          "widthMm": 18,
+          "forkOuterDiameterMm": 32.8,
+          "forkClearanceDiameterMm": 25,
+          "endLengthMm": 13,
+          "slot": {
+            "startXmm": 27,
+            "startYmm": 0,
+            "endXmm": 59,
+            "endYmm": 0
+          },
+          "defaultRotationDeg": 22
+        }
+      },
+      "optics": {
+        "behavior": "transmit",
+        "wavelengthNm": 650,
+        "sourcePort": {
+          "xMm": 23,
+          "yMm": 0
+        },
+        "surface": {
+          "startXmm": 0,
+          "startYmm": 11.5,
+          "endXmm": 0,
+          "endYmm": -11.5
+        },
+        "outputWavelengthNm": 532
+      }
+    },
+    {
+      "id": "beamsplitter-cube-1inch",
+      "name": "一英寸分束立方",
+      "type": "beamsplitter",
+      "typeLabel": "分束元件",
+      "visualKind": "beamsplitter",
+      "defaultPlacement": {
+        "xMm": 105,
+        "yMm": 120,
+        "rotationDeg": 0
+      },
+      "geometry": {
+        "body": {
+          "widthMm": 25.4,
+          "heightMm": 25.4
+        },
+        "post": {
+          "centerXmm": 0,
+          "centerYmm": 0,
+          "diameterMm": 25
+        },
+        "clamp": {
+          "widthMm": 18,
+          "forkOuterDiameterMm": 32.8,
+          "forkClearanceDiameterMm": 25,
+          "endLengthMm": 13,
+          "slot": {
+            "startXmm": 27,
+            "startYmm": 0,
+            "endXmm": 59,
+            "endYmm": 0
+          },
+          "defaultRotationDeg": 22
+        }
+      },
+      "optics": {
+        "behavior": "split",
+        "wavelengthNm": 650,
+        "sourcePort": {
+          "xMm": 23,
+          "yMm": 0
+        },
+        "surface": {
+          "startXmm": -12.7,
+          "startYmm": -12.7,
+          "endXmm": 12.7,
+          "endYmm": 12.7
         },
         "outputWavelengthNm": 532
       }

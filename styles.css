@@ -77,7 +77,8 @@ label {
 
 select,
 button,
-input[type="number"] {
+input[type="number"],
+input[type="text"] {
   min-height: 36px;
   border: 1px solid #c9d2df;
   border-radius: 6px;
@@ -143,6 +144,16 @@ p {
   gap: 14px;
 }
 
+.component-library-name {
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.component-library-name strong {
+  color: #344054;
+}
+
 .status {
   border: 1px solid #d8dee8;
   border-radius: 8px;
@@ -183,20 +194,36 @@ p {
 }
 
 .toolbar span {
-  margin-left: auto;
   color: #667085;
   font-size: 13px;
 }
 
+.toolbar #readout {
+  margin-left: auto;
+}
+
+#exportStatus {
+  color: #176a76;
+}
+
 .placement-bar {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(180px, 260px) auto auto;
   gap: 10px;
   align-items: center;
   min-height: 62px;
   padding: 10px 14px;
   border-bottom: 1px solid #94d2d8;
   background: #ecfafb;
+}
+
+.placement-label {
+  gap: 4px;
+  font-size: 12px;
+}
+
+.placement-label input {
+  min-height: 32px;
 }
 
 .placement-bar small {
@@ -306,6 +333,12 @@ p {
   stroke-width: 1.4;
 }
 
+.splitter-face {
+  stroke: #45a3ad;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
 .mirror-back,
 .mirror-face {
   stroke-linecap: round;
@@ -385,6 +418,7 @@ p {
 .label {
   fill: #344054;
   font-size: 11px;
+  pointer-events: none;
   user-select: none;
 }
 
@@ -561,6 +595,25 @@ input[type="search"] {
   width: 4px;
   height: 66px;
   background: #3d4656;
+}
+
+.thumbnail-beamsplitter::before {
+  left: 66px;
+  top: 16px;
+  width: 50px;
+  height: 50px;
+  border: 2px solid #375a7f;
+  border-radius: 3px;
+  background: rgba(184, 224, 228, 0.54);
+}
+
+.thumbnail-beamsplitter::after {
+  left: 68px;
+  top: 41px;
+  width: 50px;
+  height: 2px;
+  background: #45a3ad;
+  transform: rotate(45deg);
 }
 
 .picker-footer {

@@ -3,8 +3,12 @@ const tablePreset = document.querySelector("#tablePreset");
 const openComponentPicker = document.querySelector("#openComponentPicker");
 const resetView = document.querySelector("#resetView");
 const clearAll = document.querySelector("#clearAll");
+const exportSvg = document.querySelector("#exportSvg");
+const exportPng = document.querySelector("#exportPng");
+const exportStatus = document.querySelector("#exportStatus");
 const placementBar = document.querySelector("#placementBar");
 const pendingComponentName = document.querySelector("#pendingComponentName");
+const pendingComponentLabel = document.querySelector("#pendingComponentLabel");
 const cancelPlacement = document.querySelector("#cancelPlacement");
 const confirmPlacement = document.querySelector("#confirmPlacement");
 const componentPicker = document.querySelector("#componentPicker");
@@ -17,6 +21,8 @@ const componentCatalog = document.querySelector("#componentCatalog");
 const pickerSelectionSummary = document.querySelector("#pickerSelectionSummary");
 const inspector = document.querySelector("#inspector");
 const emptyState = document.querySelector("#emptyState");
+const componentLibraryName = document.querySelector("#componentLibraryName");
+const componentLabel = document.querySelector("#componentLabel");
 const componentRotation = document.querySelector("#componentRotation");
 const componentRotationNumber = document.querySelector("#componentRotationNumber");
 const componentRotationValue = document.querySelector("#componentRotationValue");
@@ -124,6 +130,20 @@ function reflect(direction, mirrorDirection) {
   const normal = { x: -tangent.y, y: tangent.x };
   const reflected = sub(direction, mul(normal, 2 * dot(direction, normal)));
   return normalize(reflected);
+}
+
+function getLensEllipseGeometry(surface) {
+  const start = { x: surface.startXmm, y: surface.startYmm };
+  const end = { x: surface.endXmm, y: surface.endYmm };
+  const direction = sub(end, start);
+  const center = mul(add(start, end), 0.5);
+  return {
+    cx: center.x,
+    cy: center.y,
+    rx: Math.max(0.5, length(direction) / 2),
+    ry: 1.5,
+    transform: `rotate(${radToDeg(Math.atan2(direction.y, direction.x))} ${center.x} ${center.y})`,
+  };
 }
 
 function gammaCorrect(value) {
@@ -510,6 +530,7 @@ function makeComponent(definition, options = {}) {
     id: crypto.randomUUID(),
     catalogId: definition.id,
     name: definition.name,
+    label: definition.name,
     type: definition.type,
     typeLabel: definition.typeLabel,
     visualKind: definition.visualKind,
@@ -544,6 +565,112 @@ function clearSvg() {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 }
 
+function getExportStyles() {
+  return [...document.styleSheets]
+    .flatMap((sheet) => {
+      try {
+        return [...sheet.cssRules].map((rule) => rule.cssText);
+      } catch {
+        return [];
+      }
+    })
+    .join("\n");
+}
+
+function createExportSvg() {
+  const clone = svg.cloneNode(true);
+  const width = Number(svg.getAttribute("width"));
+  const height = Number(svg.getAttribute("height"));
+  clone.setAttribute("xmlns", NS);
+  clone.setAttribute("width", width);
+  clone.setAttribute("height", height);
+  clone.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+  clone.querySelectorAll(".selected-outline, .pending-outline").forEach((node) => node.remove());
+  clone.querySelectorAll(".selected, .pending").forEach((node) => {
+    node.classList.remove("selected", "pending");
+  });
+  state.components
+    .filter((component) => component.placementState !== "placed")
+    .forEach((component) => {
+      clone.querySelectorAll(
+        `[data-component-id="${component.id}"], [data-label-component-id="${component.id}"]`,
+      ).forEach((node) => node.remove());
+    });
+
+  const background = createSvg("rect", {
+    width,
+    height,
+    fill: "#e9edf3",
+  });
+  const defs = clone.querySelector("defs") ?? createSvg("defs");
+  if (!defs.parentNode) clone.prepend(defs);
+  const style = createSvg("style");
+  style.textContent = getExportStyles();
+  defs.appendChild(style);
+  defs.after(background);
+  return clone;
+}
+
+function createExportSvgMarkup() {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(createExportSvg())}`;
+}
+
+function downloadBlob(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  exportStatus.textContent = `已生成 ${filename}`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function downloadSvg() {
+  downloadBlob(
+    "optical-layout.svg",
+    new Blob([createExportSvgMarkup()], { type: "image/svg+xml;charset=utf-8" }),
+  );
+}
+
+async function createExportPngBlob() {
+  const markup = createExportSvgMarkup();
+  const svgUrl = URL.createObjectURL(new Blob([markup], { type: "image/svg+xml;charset=utf-8" }));
+  const image = new Image();
+  image.src = svgUrl;
+  try {
+    await image.decode();
+    const width = Number(svg.getAttribute("width"));
+    const height = Number(svg.getAttribute("height"));
+    const pixelRatio = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = width * pixelRatio;
+    canvas.height = height * pixelRatio;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#e9edf3";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
+}
+
+async function downloadPng() {
+  exportStatus.textContent = "正在生成 PNG...";
+  try {
+    const blob = await createExportPngBlob();
+    if (blob) downloadBlob("optical-layout.png", blob);
+  } catch {
+    exportStatus.textContent = "PNG 生成失败";
+  }
+}
+
+window.OPTICAL_LAYOUT_EXPORT = {
+  createSvgMarkup: createExportSvgMarkup,
+  createPngBlob: createExportPngBlob,
+};
+
 function render() {
   clearSvg();
   const tableScreen = worldToScreen({ x: state.table.width, y: state.table.height });
@@ -558,6 +685,7 @@ function render() {
   state.components.forEach(renderComponent);
   renderBeams();
   renderActiveClamp();
+  renderLabels();
   renderInspector();
   renderPlacementUi();
   readout.textContent = `${state.scale.toFixed(2)} px = 1 mm`;
@@ -653,15 +781,6 @@ function renderComponent(component) {
       rx: 3,
     }),
   );
-  group.appendChild(
-    createSvg("circle", {
-      class: "post",
-      cx: component.post.centerX,
-      cy: component.post.centerY,
-      r: component.post.diameter / 2,
-    }),
-  );
-
   if (component.visualKind === "source") {
     group.appendChild(
       createSvg("circle", {
@@ -674,17 +793,26 @@ function renderComponent(component) {
     group.appendChild(
       createSvg("path", {
         class: "source-symbol",
-        d: `M ${-width / 2 + 7} ${-height / 2 + 6} L ${-4} 0 L ${-width / 2 + 7} ${height / 2 - 6} Z`,
+        d: "M -12 -4 L -4 0 L -12 4 Z",
       }),
     );
   } else if (component.visualKind === "lens") {
+    const lens = getLensEllipseGeometry(component.optics.surface);
     group.appendChild(
       createSvg("ellipse", {
         class: "optic",
-        cx: 0,
-        cy: -2,
-        rx: 8,
-        ry: height / 2 - 6,
+        ...lens,
+      }),
+    );
+  } else if (component.visualKind === "beamsplitter") {
+    const surface = component.optics.surface;
+    group.appendChild(
+      createSvg("line", {
+        class: "splitter-face",
+        x1: surface.startXmm,
+        y1: surface.startYmm,
+        x2: surface.endXmm,
+        y2: surface.endYmm,
       }),
     );
   } else {
@@ -709,16 +837,6 @@ function renderComponent(component) {
     );
   }
 
-  const pivot = getPostCenter(component);
-  group.appendChild(createSvg("circle", { class: "pivot", cx: pivot.x, cy: pivot.y, r: 3 }));
-  group.appendChild(
-    createSvg("text", {
-      class: "label",
-      x: -width / 2,
-      y: -height / 2 - 6,
-    }),
-  ).textContent = component.name;
-
   svg.appendChild(group);
 }
 
@@ -740,6 +858,50 @@ function renderActiveClamp() {
   const component = state.components.find((item) => item.id === activeId);
   if (!component) return;
   renderClamp(component, getStoredClampResult(component), true);
+}
+
+function getComponentLabelBounds(component) {
+  const { width, height } = component.size;
+  const post = component.post;
+  const clampResult = getStoredClampResult(component);
+  const points = [
+    ...transformComponentPolygon(component, rectPolygon(-width / 2, -height / 2, width, height)),
+    ...transformComponentPolygon(component, circlePolygon(post.centerX, post.centerY, post.diameter / 2)),
+    ...transformClampPolygon(component, clampResult.effectiveClampRotation),
+  ].map(worldToScreen);
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  return {
+    centerX: (Math.min(...xs) + Math.max(...xs)) / 2,
+    bottomY: Math.max(...ys),
+  };
+}
+
+function renderLabels() {
+  const labelLayer = createSvg("g", { class: "label-layer" });
+  state.components.forEach((component) => {
+    const label = component.label ?? component.name;
+    if (!label) return;
+    const bounds = getComponentLabelBounds(component);
+    const text = createSvg("text", {
+      class: "label",
+      "data-label-component-id": component.id,
+      x: bounds.centerX,
+      y: bounds.bottomY + 10,
+      "text-anchor": "middle",
+      "dominant-baseline": "hanging",
+    });
+    text.textContent = label;
+    labelLayer.appendChild(text);
+  });
+  svg.appendChild(labelLayer);
+}
+
+function updateRenderedLabel(component) {
+  const label = component.label ?? component.name;
+  svg.querySelectorAll(`[data-label-component-id="${component.id}"]`).forEach((node) => {
+    node.textContent = label;
+  });
 }
 
 function getSourceRay(component) {
@@ -787,28 +949,37 @@ function distanceToTableEdge(origin, direction) {
 }
 
 function applyOpticalInteraction(component, beamState) {
+  if (component.optics.behavior === "split") {
+    return [
+      beamState,
+      {
+        ...beamState,
+        direction: reflect(beamState.direction, beamState.surfaceDirection),
+        kind: "reflected",
+      },
+    ];
+  }
+
   if (component.optics.behavior === "reflect") {
-    return {
+    return [{
       ...beamState,
       direction: reflect(beamState.direction, beamState.surfaceDirection),
-    };
+      kind: "reflected",
+    }];
   }
 
   if (component.optics.behavior === "wavelength-shift") {
-    return {
+    return [{
       ...beamState,
       wavelengthNm: component.optics.outputWavelengthNm ?? beamState.wavelengthNm,
-    };
+    }];
   }
 
   if (component.optics.behavior === "absorb") {
-    return {
-      ...beamState,
-      terminated: true,
-    };
+    return [];
   }
 
-  return beamState;
+  return [beamState];
 }
 
 function traceBeam(source) {
@@ -816,16 +987,18 @@ function traceBeam(source) {
   const interactions = state.components
     .filter((item) => item.optics.surface && item.placementState === "placed")
     .map(getInteractionSegment);
-  let { origin, direction, wavelengthNm } = getSourceRay(source);
-  const usedHits = new Set();
+  const initialRay = getSourceRay(source);
+  const rays = [{ ...initialRay, kind: "incoming", usedHits: new Set(), steps: 0 }];
 
-  for (let bounce = 0; bounce < 4; bounce += 1) {
+  while (rays.length > 0) {
+    const ray = rays.shift();
+    const { origin, direction, wavelengthNm, usedHits, steps, kind } = ray;
     const hits = interactions
       .map((interaction) => ({
         interaction,
         hit: raySegmentIntersection(origin, direction, interaction.start, interaction.end),
       }))
-      .filter((entry) => entry.hit && !usedHits.has(`${entry.interaction.component.id}:${bounce}`))
+      .filter((entry) => entry.hit && !usedHits.has(entry.interaction.component.id))
       .sort((a, b) => a.hit.rayT - b.hit.rayT);
 
     const nearest = hits[0];
@@ -835,21 +1008,29 @@ function traceBeam(source) {
         start: origin,
         end: add(origin, mul(direction, edgeDistance)),
         wavelengthNm,
+        kind,
       });
-      break;
+      continue;
     }
 
-    segments.push({ start: origin, end: nearest.hit.point, wavelengthNm });
-    usedHits.add(`${nearest.interaction.component.id}:${bounce}`);
-    const nextBeam = applyOpticalInteraction(nearest.interaction.component, {
+    segments.push({ start: origin, end: nearest.hit.point, wavelengthNm, kind });
+    if (steps >= 3) continue;
+    const nextUsedHits = new Set(usedHits);
+    nextUsedHits.add(nearest.interaction.component.id);
+    const nextBeams = applyOpticalInteraction(nearest.interaction.component, {
       direction,
       wavelengthNm,
       surfaceDirection: sub(nearest.interaction.end, nearest.interaction.start),
+      kind,
     });
-    if (nextBeam.terminated) break;
-    direction = nextBeam.direction;
-    wavelengthNm = nextBeam.wavelengthNm;
-    origin = add(nearest.hit.point, mul(direction, 0.8));
+    nextBeams.forEach((nextBeam) => {
+      rays.push({
+        ...nextBeam,
+        origin: add(nearest.hit.point, mul(nextBeam.direction, 0.8)),
+        usedHits: new Set(nextUsedHits),
+        steps: steps + 1,
+      });
+    });
   }
 
   return segments;
@@ -860,12 +1041,12 @@ function renderBeams() {
   state.components
     .filter((component) => component.optics.behavior === "source" && component.placementState === "placed")
     .forEach((source) => {
-      traceBeam(source).forEach((segment, index) => {
+      traceBeam(source).forEach((segment) => {
         const start = worldToScreen(segment.start);
         const end = worldToScreen(segment.end);
         beamGroup.appendChild(
           createSvg("line", {
-            class: index === 0 ? "beam incoming" : "beam reflected",
+            class: `beam ${segment.kind}`,
             stroke: wavelengthToColor(segment.wavelengthNm),
             "data-wavelength-nm": segment.wavelengthNm,
             x1: start.x,
@@ -905,6 +1086,15 @@ function renderClamp(component, result, isSelected) {
       y2: component.clamp.slotEnd.y,
     }),
   );
+  clampGroup.appendChild(
+    createSvg("circle", {
+      class: "post",
+      cx: 0,
+      cy: 0,
+      r: component.post.diameter / 2,
+    }),
+  );
+  clampGroup.appendChild(createSvg("circle", { class: "pivot", cx: 0, cy: 0, r: 3 }));
   svg.appendChild(clampGroup);
 
   const screwPoint = result.candidate ?? result.slotEnd;
@@ -926,6 +1116,8 @@ function renderInspector() {
   emptyState.hidden = Boolean(selected);
   if (!selected) return;
 
+  componentLibraryName.textContent = selected.name;
+  componentLabel.value = selected.label ?? selected.name;
   componentRotation.value = selected.rotation;
   componentRotationNumber.value = Math.round(selected.rotation);
   componentRotationValue.textContent = `${Math.round(selected.rotation)} deg`;
@@ -977,6 +1169,7 @@ function renderPlacementUi() {
 
   const result = getStoredClampResult(pending);
   pendingComponentName.textContent = pending.name;
+  pendingComponentLabel.value = pending.label ?? pending.name;
   confirmPlacement.disabled = !result.valid;
 }
 
@@ -1163,6 +1356,22 @@ svg.addEventListener("click", (event) => {
   render();
 });
 
+pendingComponentLabel.addEventListener("input", () => {
+  const pending = state.components.find((component) => component.id === state.pendingComponentId);
+  if (!pending) return;
+  pending.label = pendingComponentLabel.value;
+  componentLabel.value = pending.label;
+  updateRenderedLabel(pending);
+});
+
+componentLabel.addEventListener("input", () => {
+  const selected = getSelected();
+  if (!selected) return;
+  selected.label = componentLabel.value;
+  if (selected.id === state.pendingComponentId) pendingComponentLabel.value = selected.label;
+  updateRenderedLabel(selected);
+});
+
 componentRotation.addEventListener("input", () => {
   const selected = getSelected();
   if (!selected) return;
@@ -1249,6 +1458,15 @@ clearAll.addEventListener("click", () => {
   state.pendingComponentId = null;
   render();
 });
+
+exportSvg.addEventListener("click", () => {
+  try {
+    downloadSvg();
+  } catch {
+    exportStatus.textContent = "SVG 生成失败";
+  }
+});
+exportPng.addEventListener("click", downloadPng);
 
 state.components.push(makeComponent(catalog.find((item) => item.id === "laser-source")));
 state.components.push({

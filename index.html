@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>光路图孔位固定原型</title>
-    <link rel="stylesheet" href="./styles.css?v=3" />
+    <link rel="stylesheet" href="./styles.css?v=5" />
   </head>
   <body>
     <main class="app">
@@ -39,6 +39,13 @@
           <h2>选中元件</h2>
           <div id="emptyState" class="empty">点击元件后编辑固定方式</div>
           <div id="inspector" class="inspector" hidden>
+            <div class="component-library-name">
+              元件库名称：<strong id="componentLibraryName"></strong>
+            </div>
+            <label>
+              元件标签
+              <input id="componentLabel" type="text" />
+            </label>
             <label>
               元件角度
               <div class="input-row">
@@ -85,6 +92,9 @@
         <div class="toolbar">
           <button id="resetView" type="button">重置视图</button>
           <button id="clearAll" type="button">清空元件</button>
+          <button id="exportSvg" type="button">导出 SVG</button>
+          <button id="exportPng" type="button">导出 PNG</button>
+          <span id="exportStatus" role="status"></span>
           <span id="readout">1 px = 1 mm</span>
         </div>
         <div id="placementBar" class="placement-bar" hidden>
@@ -93,6 +103,10 @@
             <strong>悬置：<span id="pendingComponentName"></span></strong>
             <small>拖动元件预览孔位与压板位置，确认后再置入光路。</small>
           </div>
+          <label class="placement-label">
+            标签
+            <input id="pendingComponentLabel" type="text" />
+          </label>
           <button id="cancelPlacement" type="button">取消</button>
           <button id="confirmPlacement" class="primary-button" type="button">置入</button>
         </div>
@@ -123,6 +137,7 @@
               <option value="source">光源</option>
               <option value="reflector">反射元件</option>
               <option value="transmissive">透射元件</option>
+              <option value="beamsplitter">分束元件</option>
             </select>
           </label>
         </div>
@@ -135,7 +150,7 @@
       </div>
     </div>
 
-    <script src="./component-library.js?v=7"></script>
-    <script src="./app.js?v=12"></script>
+    <script src="./component-library.js?v=8"></script>
+    <script src="./app.js?v=23"></script>
   </body>
 </html>
