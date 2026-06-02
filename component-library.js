@@ -60,8 +60,8 @@ window.OPTICAL_COMPONENT_LIBRARY = {
       "visualKind": "mirror",
       "defaultPlacement": {
         "xMm": 105,
-        "yMm": 120,
-        "rotationDeg": 0
+        "yMm": 130,
+        "rotationDeg": -135
       },
       "geometry": {
         "body": {

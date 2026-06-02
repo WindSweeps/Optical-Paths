@@ -36,7 +36,7 @@ Polarization matrices and Gaussian-beam ABCD calculations are not implemented ye
 
 | Component | Type | Notes |
 | --- | --- | --- |
-| Ultrastable Mirror Mount Beam Coupler | Source | Adjustable emission angle and wavelength |
+| Ultrastable Mount Beam Coupler | Source | Adjustable emission angle and wavelength |
 | Ultrastable 1-inch Mirror Mount | Reflective element | Reflects rays at its optical surface |
 | Lens Mount | Transmissive element | Allows rays to pass through |
 | 1-inch Wave Plate Mount | Polarization element | Currently displayed as a transmissive element |

@@ -212,7 +212,7 @@ const translations = {
 };
 const componentTranslations = {
   "laser-source": {
-    en: { name: "Ultrastable Mirror Mount Beam Coupler", typeLabel: "Source" },
+    en: { name: "Ultrastable Mount Beam Coupler", typeLabel: "Source" },
   },
   "mirror-mount": {
     en: { name: "Ultrastable 1-inch Mirror Mount", typeLabel: "Reflective Element" },
@@ -1931,8 +1931,7 @@ applyStaticTranslations();
 state.components.push(makeComponent(catalog.find((item) => item.id === "laser-source")));
 state.components.push({
   ...makeComponent(catalog.find((item) => item.id === "mirror-mount")),
-  position: { x: 150, y: 150 },
-  rotation: 45,
+  position: { x: 150, y: 160 },
 });
 state.selectedId = state.components[1].id;
 render();
