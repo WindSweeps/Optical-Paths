@@ -46,9 +46,11 @@ const readout = document.querySelector("#readout");
 
 const NS = "http://www.w3.org/2000/svg";
 const presets = {
-  "300x300": { width: 300, height: 300, pitch: 25, margin: 25 },
-  "450x300": { width: 450, height: 300, pitch: 25, margin: 25 },
-  "600x450": { width: 600, height: 450, pitch: 25, margin: 25 },
+  "900x600": { width: 900, height: 600, pitch: 25, margin: 12.5 },
+  "600x600": { width: 600, height: 600, pitch: 25, margin: 12.5 },
+  "600x300": { width: 600, height: 300, pitch: 25, margin: 12.5 },
+  "450x300": { width: 450, height: 300, pitch: 25, margin: 12.5 },
+  "300x300": { width: 300, height: 300, pitch: 25, margin: 12.5 },
 };
 const translations = {
   zh: {
@@ -57,9 +59,11 @@ const translations = {
     brandSubtitle: "孔位固定原型",
     opticalTable: "光学桌",
     tableSize: "桌面尺寸",
-    table300: "300 x 300 mm 面包板",
-    table450: "450 x 300 mm 面包板",
-    table600: "600 x 450 mm 光学桌",
+    table900x600: "900 x 600 mm 面包板",
+    table600x600: "600 x 600 mm 面包板",
+    table600x300: "600 x 300 mm 面包板",
+    table450x300: "450 x 300 mm 面包板",
+    table300x300: "300 x 300 mm 面包板",
     holePitch: "孔距",
     edgeMargin: "边距",
     componentLibrary: "元件库",
@@ -133,9 +137,11 @@ const translations = {
     brandSubtitle: "Hole Mounting Prototype",
     opticalTable: "Optical Table",
     tableSize: "Table Size",
-    table300: "300 x 300 mm Breadboard",
-    table450: "450 x 300 mm Breadboard",
-    table600: "600 x 450 mm Optical Table",
+    table900x600: "900 x 600 mm Breadboard",
+    table600x600: "600 x 600 mm Breadboard",
+    table600x300: "600 x 300 mm Breadboard",
+    table450x300: "450 x 300 mm Breadboard",
+    table300x300: "300 x 300 mm Breadboard",
     holePitch: "Hole Pitch",
     edgeMargin: "Edge Margin",
     componentLibrary: "Component Library",
@@ -249,6 +255,10 @@ function t(key, variables = {}) {
     (text, [name, value]) => text.replaceAll(`{${name}}`, value),
     template,
   );
+}
+
+function formatMm(value) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function getCatalogName(definition) {
@@ -1326,13 +1336,53 @@ function raySegmentIntersection(origin, direction, start, end) {
   };
 }
 
-function distanceToTableEdge(origin, direction) {
+function rayRectangleDistances(origin, direction, bounds) {
+  const epsilon = 0.000001;
   const distances = [];
-  if (direction.x > 0) distances.push((state.table.width - origin.x) / direction.x);
-  if (direction.x < 0) distances.push((0 - origin.x) / direction.x);
-  if (direction.y > 0) distances.push((state.table.height - origin.y) / direction.y);
-  if (direction.y < 0) distances.push((0 - origin.y) / direction.y);
-  return Math.min(...distances.filter((value) => value > 0));
+  const addVerticalEdge = (x) => {
+    if (Math.abs(direction.x) < epsilon) return;
+    const distance = (x - origin.x) / direction.x;
+    const y = origin.y + direction.y * distance;
+    if (distance > epsilon && y >= bounds.minY - epsilon && y <= bounds.maxY + epsilon) {
+      distances.push(distance);
+    }
+  };
+  const addHorizontalEdge = (y) => {
+    if (Math.abs(direction.y) < epsilon) return;
+    const distance = (y - origin.y) / direction.y;
+    const x = origin.x + direction.x * distance;
+    if (distance > epsilon && x >= bounds.minX - epsilon && x <= bounds.maxX + epsilon) {
+      distances.push(distance);
+    }
+  };
+
+  addVerticalEdge(bounds.minX);
+  addVerticalEdge(bounds.maxX);
+  addHorizontalEdge(bounds.minY);
+  addHorizontalEdge(bounds.maxY);
+  return distances;
+}
+
+function distanceToTableEdge(origin, direction) {
+  const tableDistances = rayRectangleDistances(origin, direction, {
+    minX: 0,
+    minY: 0,
+    maxX: state.table.width,
+    maxY: state.table.height,
+  });
+  if (tableDistances.length > 0) return Math.max(...tableDistances);
+
+  const canvasWidth = Number(svg.getAttribute("width"));
+  const canvasHeight = Number(svg.getAttribute("height"));
+  const canvasDistances = rayRectangleDistances(origin, direction, {
+    minX: -state.offset.x / state.scale,
+    minY: -state.offset.y / state.scale,
+    maxX: (canvasWidth - state.offset.x) / state.scale,
+    maxY: (canvasHeight - state.offset.y) / state.scale,
+  });
+  return canvasDistances.length > 0
+    ? Math.max(...canvasDistances)
+    : Math.hypot(state.table.width, state.table.height);
 }
 
 function applyOpticalInteraction(component, beamState) {
@@ -1532,7 +1582,7 @@ function renderInspector() {
       : "";
     lockStatus.innerHTML = `
       <strong>${t("mounted")}</strong><br>
-      ${t("screwHole", { x: result.candidate.x.toFixed(0), y: result.candidate.y.toFixed(0) })}<br>
+      ${t("screwHole", { x: formatMm(result.candidate.x), y: formatMm(result.candidate.y) })}<br>
       ${adjustment}<br>
       ${t("noClampOverlap")}${warning}
     `;
