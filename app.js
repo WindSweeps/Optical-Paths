@@ -1,4 +1,5 @@
 const svg = document.querySelector("#canvas");
+const canvasShell = document.querySelector(".canvas-shell");
 const tablePreset = document.querySelector("#tablePreset");
 const openComponentPicker = document.querySelector("#openComponentPicker");
 const resetView = document.querySelector("#resetView");
@@ -241,6 +242,7 @@ const state = {
   selectedId: null,
   maxAutoTurnDeg: 180,
   drag: null,
+  pan: null,
   clickContext: null,
   suppressNextClick: false,
   pendingComponentId: null,
@@ -1622,6 +1624,12 @@ function pointerPosition(event) {
   };
 }
 
+function releaseSvgPointer(event) {
+  if (svg.hasPointerCapture?.(event.pointerId)) {
+    svg.releasePointerCapture(event.pointerId);
+  }
+}
+
 function selectComponent(id) {
   state.selectedId = id;
   render();
@@ -1729,9 +1737,24 @@ function placePendingComponent() {
 
 svg.addEventListener("pointerdown", (event) => {
   const id = componentIdFromEventTarget(event.target);
-  if (!id) return;
+  if (!id) {
+    if (event.pointerType === "touch" || event.pointerType === "pen") {
+      event.preventDefault();
+      state.pan = {
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startScrollLeft: canvasShell.scrollLeft,
+        startScrollTop: canvasShell.scrollTop,
+        moved: false,
+      };
+      svg.setPointerCapture(event.pointerId);
+    }
+    return;
+  }
   const component = state.components.find((item) => item.id === id);
   if (!component) return;
+  event.preventDefault();
   const world = screenToWorld(pointerPosition(event));
   const screen = pointerPosition(event);
   const wasSelected = state.selectedId === id;
@@ -1739,6 +1762,7 @@ svg.addEventListener("pointerdown", (event) => {
   state.clickContext = { id, wasSelected };
   state.drag = {
     id,
+    pointerId: event.pointerId,
     wasSelected,
     pointerOffset: sub(world, component.position),
     startScreen: screen,
@@ -1749,7 +1773,20 @@ svg.addEventListener("pointerdown", (event) => {
 });
 
 svg.addEventListener("pointermove", (event) => {
+  if (state.pan?.pointerId === event.pointerId) {
+    event.preventDefault();
+    const dx = event.clientX - state.pan.startClientX;
+    const dy = event.clientY - state.pan.startClientY;
+    if (Math.hypot(dx, dy) > 3) {
+      state.pan.moved = true;
+    }
+    canvasShell.scrollLeft = state.pan.startScrollLeft - dx;
+    canvasShell.scrollTop = state.pan.startScrollTop - dy;
+    return;
+  }
   if (!state.drag) return;
+  if (state.drag.pointerId !== event.pointerId) return;
+  event.preventDefault();
   const component = state.components.find((item) => item.id === state.drag.id);
   if (!component) return;
   const screen = pointerPosition(event);
@@ -1762,7 +1799,16 @@ svg.addEventListener("pointermove", (event) => {
 });
 
 svg.addEventListener("pointerup", (event) => {
+  if (state.pan?.pointerId === event.pointerId) {
+    if (state.pan.moved) {
+      state.suppressNextClick = true;
+    }
+    state.pan = null;
+    releaseSvgPointer(event);
+    return;
+  }
   if (state.drag) {
+    if (state.drag.pointerId !== event.pointerId) return;
     const finishedDrag = state.drag;
     state.suppressNextClick = true;
     if (!finishedDrag.moved && finishedDrag.wasSelected && finishedDrag.id !== state.pendingComponentId) {
@@ -1771,9 +1817,21 @@ svg.addEventListener("pointerup", (event) => {
       state.selectedId = finishedDrag.id;
     }
     state.drag = null;
-    svg.releasePointerCapture(event.pointerId);
+    releaseSvgPointer(event);
     render();
   }
+});
+
+svg.addEventListener("pointercancel", (event) => {
+  if (state.pan?.pointerId === event.pointerId) {
+    state.pan = null;
+  }
+  if (state.drag?.pointerId === event.pointerId) {
+    state.drag = null;
+    render();
+  }
+  state.clickContext = null;
+  releaseSvgPointer(event);
 });
 
 svg.addEventListener("click", (event) => {
