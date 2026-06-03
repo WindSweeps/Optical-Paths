@@ -313,6 +313,7 @@ p {
   --axis-track-color: #cfd8e4;
   --axis-window-color: #2f80ed;
   --axis-border-color: #b7c3d0;
+  --axis-thumb-border: #667085;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -383,14 +384,17 @@ p {
   box-shadow: 0 1px 3px rgba(23, 32, 51, 0.22);
 }
 
-.axis-control input[type="range"]:disabled::-webkit-slider-thumb {
-  border-color: #8793a3;
-  background: #eef2f6;
+.axis-control.active {
+  --axis-window-color: #f59f00;
+  --axis-thumb-border: #b54708;
 }
 
-.axis-control input[type="range"]:disabled::-moz-range-thumb {
-  border-color: #8793a3;
-  background: #eef2f6;
+.axis-control input[type="range"]::-webkit-slider-thumb {
+  border-color: var(--axis-thumb-border);
+}
+
+.axis-control input[type="range"]::-moz-range-thumb {
+  border-color: var(--axis-thumb-border);
 }
 
 .x-axis-control {

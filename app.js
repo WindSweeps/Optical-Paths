@@ -1751,10 +1751,10 @@ function updateViewportControls() {
   const yState = getAxisControlState("y");
   viewportX.max = Math.round(xState.max);
   viewportY.max = Math.round(yState.max);
-  viewportX.disabled = !xState.active;
-  viewportY.disabled = !yState.active;
   viewportX.value = Math.round(xState.value);
   viewportY.value = Math.round(yState.value);
+  viewportX.closest(".axis-control")?.classList.toggle("active", xState.active);
+  viewportY.closest(".axis-control")?.classList.toggle("active", yState.active);
 }
 
 function setViewportPosition(axis, value) {
