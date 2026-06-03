@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>光路图孔位固定原型</title>
-    <link rel="stylesheet" href="./styles.css?v=12" />
+    <link rel="stylesheet" href="./styles.css?v=20" />
   </head>
   <body>
     <main class="app">
@@ -124,8 +124,18 @@
           <button id="cancelPlacement" type="button" data-i18n="cancel">取消</button>
           <button id="confirmPlacement" class="primary-button" type="button" data-i18n="place">置入</button>
         </div>
-        <div class="canvas-shell">
-          <svg id="canvas" aria-label="光学桌画布" data-i18n-aria-label="canvasLabel"></svg>
+        <div class="canvas-controls" aria-label="位置" data-i18n-aria-label="positionControl">
+          <div class="canvas-shell">
+            <svg id="canvas" aria-label="光学桌画布" data-i18n-aria-label="canvasLabel"></svg>
+          </div>
+          <label class="axis-control x-axis-control">
+            <span aria-hidden="true">X</span>
+            <input id="viewportX" type="range" min="0" max="0" step="1" value="0" aria-label="X 轴位置" data-i18n-aria-label="viewportX" />
+          </label>
+          <label class="axis-control y-axis-control">
+            <span aria-hidden="true">Y</span>
+            <input id="viewportY" type="range" min="0" max="0" step="1" value="0" aria-label="Y 轴位置" data-i18n-aria-label="viewportY" />
+          </label>
         </div>
       </section>
     </main>
@@ -188,6 +198,6 @@
     </div>
 
     <script src="./component-library.js?v=11"></script>
-    <script src="./app.js?v=36"></script>
+    <script src="./app.js?v=42"></script>
   </body>
 </html>

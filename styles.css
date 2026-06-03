@@ -285,17 +285,191 @@ p {
 }
 
 .canvas-shell {
-  overflow: auto;
-  padding: 28px;
+  grid-area: canvas;
+  overflow: hidden;
   min-height: 0;
+  min-width: 0;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 
+.canvas-controls {
+  --drawing-viewport-width: 720px;
+  --drawing-viewport-height: 540px;
+  display: grid;
+  grid-template-areas:
+    "canvas y-axis"
+    "x-axis corner";
+  grid-template-columns: var(--drawing-viewport-width) 44px;
+  grid-template-rows: var(--drawing-viewport-height) 44px;
+  align-self: start;
+  justify-self: start;
+  margin: 28px;
+  min-height: 0;
+  min-width: 0;
+}
+
+.axis-control {
+  --axis-track-color: #cfd8e4;
+  --axis-window-color: #2f80ed;
+  --axis-border-color: #b7c3d0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.axis-control input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  min-width: 0;
+}
+
+.axis-control input[type="range"]::-webkit-slider-runnable-track {
+  height: 7px;
+  border: 1px solid var(--axis-border-color);
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--axis-track-color) 0,
+    var(--axis-track-color) var(--axis-workspace-start, 34.375%),
+    var(--axis-window-color) var(--axis-workspace-start, 34.375%),
+    var(--axis-window-color) var(--axis-workspace-end, 65.625%),
+    var(--axis-track-color) var(--axis-workspace-end, 65.625%),
+    var(--axis-track-color) 100%
+  );
+}
+
+.axis-control input[type="range"]::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  margin-top: -6.5px;
+  border: 2px solid #1f5fa8;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(23, 32, 51, 0.22);
+  -webkit-appearance: none;
+}
+
+.axis-control input[type="range"]::-moz-range-track {
+  height: 7px;
+  border: 1px solid var(--axis-border-color);
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--axis-track-color) 0,
+    var(--axis-track-color) var(--axis-workspace-start, 34.375%),
+    var(--axis-window-color) var(--axis-workspace-start, 34.375%),
+    var(--axis-window-color) var(--axis-workspace-end, 65.625%),
+    var(--axis-track-color) var(--axis-workspace-end, 65.625%),
+    var(--axis-track-color) 100%
+  );
+}
+
+.axis-control input[type="range"]::-moz-range-progress {
+  background: transparent;
+}
+
+.axis-control input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #1f5fa8;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(23, 32, 51, 0.22);
+}
+
+.axis-control input[type="range"]:disabled::-webkit-slider-thumb {
+  border-color: #8793a3;
+  background: #eef2f6;
+}
+
+.axis-control input[type="range"]:disabled::-moz-range-thumb {
+  border-color: #8793a3;
+  background: #eef2f6;
+}
+
+.x-axis-control {
+  grid-area: x-axis;
+  padding: 6px 28px 8px;
+}
+
+.x-axis-control input[type="range"] {
+  flex: 1;
+}
+
+.y-axis-control {
+  grid-area: y-axis;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  min-height: 0;
+  padding: 28px 8px;
+}
+
+.y-axis-control::after {
+  position: absolute;
+  top: 28px;
+  bottom: 28px;
+  left: 50%;
+  z-index: 0;
+  width: 7px;
+  border: 1px solid var(--axis-border-color);
+  border-radius: 999px;
+  background: linear-gradient(
+    to top,
+    var(--axis-track-color) 0,
+    var(--axis-track-color) var(--axis-workspace-start, 34.375%),
+    var(--axis-window-color) var(--axis-workspace-start, 34.375%),
+    var(--axis-window-color) var(--axis-workspace-end, 65.625%),
+    var(--axis-track-color) var(--axis-workspace-end, 65.625%),
+    var(--axis-track-color) 100%
+  );
+  content: "";
+  transform: translateX(-50%);
+}
+
+.y-axis-control input[type="range"] {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  width: 28px;
+  height: auto;
+  min-height: 0;
+  writing-mode: vertical-rl;
+  direction: rtl;
+}
+
+.y-axis-control input[type="range"]::-webkit-slider-runnable-track {
+  width: 7px;
+  height: 100%;
+  margin-inline: auto;
+  border-color: transparent;
+  background: transparent;
+}
+
+.y-axis-control input[type="range"]::-webkit-slider-thumb {
+  margin-inline: -5.5px;
+}
+
+.y-axis-control input[type="range"]::-moz-range-track {
+  width: 7px;
+  height: 100%;
+  margin-inline: auto;
+  border-color: transparent;
+  background: transparent;
+}
+
 #canvas {
   display: block;
-  min-width: 720px;
-  min-height: 540px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   touch-action: none;
   user-select: none;
   background: #e9edf3;
@@ -739,8 +913,18 @@ input[type="search"] {
     min-height: 0;
   }
 
-  .canvas-shell {
-    padding: 16px;
+  .canvas-controls {
+    grid-template-columns: var(--drawing-viewport-width) 40px;
+    grid-template-rows: var(--drawing-viewport-height) 40px;
+    margin: 16px;
+  }
+
+  .x-axis-control {
+    padding: 4px 16px 6px;
+  }
+
+  .y-axis-control {
+    padding: 16px 4px;
   }
 
   .placement-bar,

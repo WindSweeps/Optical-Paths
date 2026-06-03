@@ -1,4 +1,5 @@
 const svg = document.querySelector("#canvas");
+const canvasControls = document.querySelector(".canvas-controls");
 const canvasShell = document.querySelector(".canvas-shell");
 const tablePreset = document.querySelector("#tablePreset");
 const openComponentPicker = document.querySelector("#openComponentPicker");
@@ -10,6 +11,8 @@ const exportStatus = document.querySelector("#exportStatus");
 const zoomOut = document.querySelector("#zoomOut");
 const zoomIn = document.querySelector("#zoomIn");
 const zoomSlider = document.querySelector("#zoomSlider");
+const viewportX = document.querySelector("#viewportX");
+const viewportY = document.querySelector("#viewportY");
 const exportPreview = document.querySelector("#exportPreview");
 const closeExportPreview = document.querySelector("#closeExportPreview");
 const cancelExportPreview = document.querySelector("#cancelExportPreview");
@@ -53,6 +56,11 @@ const DEFAULT_CANVAS_SCALE = 1.55;
 const MIN_CANVAS_SCALE = 0.55;
 const MAX_CANVAS_SCALE = 4.5;
 const CANVAS_SCALE_STEP = 0.15;
+const AXIS_CONTROL_SIZE = 44;
+const CANVAS_VIEWPORT_MARGIN = 28;
+const DEFAULT_DRAWING_WIDTH = 720;
+const DEFAULT_DRAWING_HEIGHT = 540;
+const AXIS_LOGICAL_WORKSPACES = 3.2;
 const presets = {
   "900x600": { width: 900, height: 600, pitch: 25, margin: 12.5 },
   "600x600": { width: 600, height: 600, pitch: 25, margin: 12.5 },
@@ -96,6 +104,9 @@ const translations = {
     zoomOut: "缩小",
     zoomIn: "放大",
     zoomSlider: "缩放比例",
+    positionControl: "位置",
+    viewportX: "X 轴位置",
+    viewportY: "Y 轴位置",
     language: "语言",
     pendingPrefix: "悬置：",
     pendingHelp: "拖动元件预览孔位与压板位置，确认后再置入光路。",
@@ -178,6 +189,9 @@ const translations = {
     zoomOut: "Zoom Out",
     zoomIn: "Zoom In",
     zoomSlider: "Zoom Scale",
+    positionControl: "Position",
+    viewportX: "X Position",
+    viewportY: "Y Position",
     language: "Language",
     pendingPrefix: "Pending: ",
     pendingHelp: "Drag the component to preview the hole and clamp positions, then place it into the layout.",
@@ -1091,10 +1105,7 @@ window.OPTICAL_LAYOUT_EXPORT = {
 
 function render() {
   clearSvg();
-  const tableScreen = worldToScreen({ x: state.table.width, y: state.table.height });
-  svg.setAttribute("width", Math.max(720, tableScreen.x + 54));
-  svg.setAttribute("height", Math.max(540, tableScreen.y + 42));
-  svg.setAttribute("viewBox", `0 0 ${svg.getAttribute("width")} ${svg.getAttribute("height")}`);
+  updateDrawingViewportSize();
 
   autoResolveClampAngles();
   renderDefs();
@@ -1108,6 +1119,8 @@ function render() {
   renderPlacementUi();
   readout.textContent = `${state.scale.toFixed(2)} px = 1 mm`;
   zoomSlider.value = state.scale.toFixed(2);
+  updateDrawingViewportSize();
+  updateViewportControls();
 }
 
 function renderDefs() {
@@ -1668,6 +1681,94 @@ function adjustCanvasScale(delta) {
   setCanvasScale(state.scale + delta);
 }
 
+function updateDrawingViewportSize() {
+  const workspaceRect = canvasControls.parentElement.getBoundingClientRect();
+  const controlsRect = canvasControls.getBoundingClientRect();
+  const availableWidth = Math.max(
+    260,
+    workspaceRect.right - controlsRect.left - AXIS_CONTROL_SIZE - CANVAS_VIEWPORT_MARGIN,
+  );
+  const availableHeight = Math.max(
+    220,
+    workspaceRect.bottom - controlsRect.top - AXIS_CONTROL_SIZE - CANVAS_VIEWPORT_MARGIN,
+  );
+  const viewportWidth = Math.min(DEFAULT_DRAWING_WIDTH, availableWidth);
+  const viewportHeight = Math.min(DEFAULT_DRAWING_HEIGHT, availableHeight);
+  canvasControls.style.setProperty("--drawing-viewport-width", `${viewportWidth}px`);
+  canvasControls.style.setProperty("--drawing-viewport-height", `${viewportHeight}px`);
+  const workspaceStart = (((AXIS_LOGICAL_WORKSPACES - 1) / 2) / AXIS_LOGICAL_WORKSPACES) * 100;
+  canvasControls.style.setProperty("--axis-workspace-start", `${workspaceStart}%`);
+  canvasControls.style.setProperty("--axis-workspace-end", `${100 - workspaceStart}%`);
+  canvasShell.style.width = `${viewportWidth}px`;
+  canvasShell.style.height = `${viewportHeight}px`;
+  svg.setAttribute("width", viewportWidth);
+  svg.setAttribute("height", viewportHeight);
+  svg.setAttribute("viewBox", `0 0 ${viewportWidth} ${viewportHeight}`);
+}
+
+function getDrawingViewportSize() {
+  return {
+    width: Number(svg.getAttribute("width")) || DEFAULT_DRAWING_WIDTH,
+    height: Number(svg.getAttribute("height")) || DEFAULT_DRAWING_HEIGHT,
+  };
+}
+
+function getTableScreenSize() {
+  return {
+    width: state.table.width * state.scale,
+    height: state.table.height * state.scale,
+  };
+}
+
+function getTableScreenCenter() {
+  const tableSize = getTableScreenSize();
+  return {
+    x: state.offset.x + tableSize.width / 2,
+    y: state.offset.y + tableSize.height / 2,
+  };
+}
+
+function getAxisControlState(axis) {
+  const viewport = getDrawingViewportSize();
+  const tableSize = getTableScreenSize();
+  const viewportSize = axis === "x" ? viewport.width : viewport.height;
+  const opticalTableSize = axis === "x" ? tableSize.width : tableSize.height;
+  const center = axis === "x" ? getTableScreenCenter().x : getTableScreenCenter().y;
+  const tableStart = center - opticalTableSize / 2;
+  const tableEnd = center + opticalTableSize / 2;
+  const outsideMargin = ((AXIS_LOGICAL_WORKSPACES - 1) / 2) * viewportSize;
+  const max = AXIS_LOGICAL_WORKSPACES * viewportSize;
+  return {
+    max,
+    value: clampValue(center + outsideMargin, 0, max),
+    centerMin: -outsideMargin,
+    active: tableStart <= 0 || tableEnd >= viewportSize,
+  };
+}
+
+function updateViewportControls() {
+  const xState = getAxisControlState("x");
+  const yState = getAxisControlState("y");
+  viewportX.max = Math.round(xState.max);
+  viewportY.max = Math.round(yState.max);
+  viewportX.disabled = !xState.active;
+  viewportY.disabled = !yState.active;
+  viewportX.value = Math.round(xState.value);
+  viewportY.value = Math.round(yState.value);
+}
+
+function setViewportPosition(axis, value) {
+  const axisState = getAxisControlState(axis);
+  const center = clampValue(value, 0, axisState.max) + axisState.centerMin;
+  const tableSize = getTableScreenSize();
+  if (axis === "x") {
+    state.offset.x = center - tableSize.width / 2;
+  } else {
+    state.offset.y = center - tableSize.height / 2;
+  }
+  render();
+}
+
 function captureSvgPointer(event) {
   if (!svg.setPointerCapture) return;
   try {
@@ -1801,18 +1902,15 @@ svg.addEventListener("pointerdown", (event) => {
 
   const id = componentIdFromEventTarget(event.target);
   if (!id) {
-    if (event.pointerType === "touch" || event.pointerType === "pen") {
-      event.preventDefault();
-      state.pan = {
-        pointerId: event.pointerId,
-        startClientX: event.clientX,
-        startClientY: event.clientY,
-        startScrollLeft: canvasShell.scrollLeft,
-        startScrollTop: canvasShell.scrollTop,
-        moved: false,
-      };
-      captureSvgPointer(event);
-    }
+    event.preventDefault();
+    state.pan = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startOffset: { ...state.offset },
+      moved: false,
+    };
+    captureSvgPointer(event);
     return;
   }
   const component = state.components.find((item) => item.id === id);
@@ -1847,8 +1945,11 @@ svg.addEventListener("pointermove", (event) => {
     if (Math.hypot(dx, dy) > 3) {
       state.pan.moved = true;
     }
-    canvasShell.scrollLeft = state.pan.startScrollLeft - dx;
-    canvasShell.scrollTop = state.pan.startScrollTop - dy;
+    state.offset = {
+      x: state.pan.startOffset.x + dx,
+      y: state.pan.startOffset.y + dy,
+    };
+    render();
     return;
   }
   if (!state.drag) return;
@@ -2031,6 +2132,11 @@ window.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !exportPreview.hidden) closeExportDialog();
 });
 
+window.addEventListener("resize", () => {
+  updateDrawingViewportSize();
+  updateViewportControls();
+});
+
 resetView.addEventListener("click", () => {
   state.scale = DEFAULT_CANVAS_SCALE;
   state.offset = { x: 54, y: 42 };
@@ -2047,6 +2153,14 @@ zoomIn.addEventListener("click", () => {
 
 zoomSlider.addEventListener("input", () => {
   setCanvasScale(Number(zoomSlider.value));
+});
+
+viewportX.addEventListener("input", () => {
+  setViewportPosition("x", Number(viewportX.value));
+});
+
+viewportY.addEventListener("input", () => {
+  setViewportPosition("y", Number(viewportY.value));
 });
 
 clearAll.addEventListener("click", () => {
