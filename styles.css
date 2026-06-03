@@ -215,6 +215,21 @@ p {
   margin-left: 4px;
 }
 
+.zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 190px;
+}
+
+.zoom-control input[type="range"] {
+  width: 120px;
+}
+
+.zoom-control .icon-button {
+  font-weight: 700;
+}
+
 #exportStatus {
   color: #176a76;
 }
@@ -670,6 +685,14 @@ input[type="search"] {
 
   .toolbar {
     flex-wrap: wrap;
+  }
+
+  .zoom-control {
+    min-width: 220px;
+  }
+
+  .zoom-control input[type="range"] {
+    width: 140px;
   }
 
   .language-control {

@@ -7,6 +7,9 @@ const clearAll = document.querySelector("#clearAll");
 const exportSvg = document.querySelector("#exportSvg");
 const exportPng = document.querySelector("#exportPng");
 const exportStatus = document.querySelector("#exportStatus");
+const zoomOut = document.querySelector("#zoomOut");
+const zoomIn = document.querySelector("#zoomIn");
+const zoomSlider = document.querySelector("#zoomSlider");
 const exportPreview = document.querySelector("#exportPreview");
 const closeExportPreview = document.querySelector("#closeExportPreview");
 const cancelExportPreview = document.querySelector("#cancelExportPreview");
@@ -46,8 +49,10 @@ const lockStatus = document.querySelector("#lockStatus");
 const readout = document.querySelector("#readout");
 
 const NS = "http://www.w3.org/2000/svg";
+const DEFAULT_CANVAS_SCALE = 1.55;
 const MIN_CANVAS_SCALE = 0.55;
 const MAX_CANVAS_SCALE = 4.5;
+const CANVAS_SCALE_STEP = 0.15;
 const presets = {
   "900x600": { width: 900, height: 600, pitch: 25, margin: 12.5 },
   "600x600": { width: 600, height: 600, pitch: 25, margin: 12.5 },
@@ -87,6 +92,10 @@ const translations = {
     clearAll: "清空元件",
     exportSvg: "导出 SVG",
     exportPng: "导出 PNG",
+    zoomControl: "缩放",
+    zoomOut: "缩小",
+    zoomIn: "放大",
+    zoomSlider: "缩放比例",
     language: "语言",
     pendingPrefix: "悬置：",
     pendingHelp: "拖动元件预览孔位与压板位置，确认后再置入光路。",
@@ -165,6 +174,10 @@ const translations = {
     clearAll: "Clear Components",
     exportSvg: "Export SVG",
     exportPng: "Export PNG",
+    zoomControl: "Zoom",
+    zoomOut: "Zoom Out",
+    zoomIn: "Zoom In",
+    zoomSlider: "Zoom Scale",
     language: "Language",
     pendingPrefix: "Pending: ",
     pendingHelp: "Drag the component to preview the hole and clamp positions, then place it into the layout.",
@@ -238,15 +251,13 @@ const catalog = publishedLibrary.components;
 
 const state = {
   table: presets["300x300"],
-  scale: 1.55,
+  scale: DEFAULT_CANVAS_SCALE,
   offset: { x: 54, y: 42 },
   components: [],
   selectedId: null,
   maxAutoTurnDeg: 180,
   drag: null,
   pan: null,
-  pinch: null,
-  touchPointers: new Map(),
   clickContext: null,
   suppressNextClick: false,
   pendingComponentId: null,
@@ -1096,6 +1107,7 @@ function render() {
   renderInspector();
   renderPlacementUi();
   readout.textContent = `${state.scale.toFixed(2)} px = 1 mm`;
+  zoomSlider.value = state.scale.toFixed(2);
 }
 
 function renderDefs() {
@@ -1632,73 +1644,28 @@ function pointerPosition(event) {
   };
 }
 
-function rememberTouchPointer(event) {
-  if (event.pointerType !== "touch") return;
-  state.touchPointers.set(event.pointerId, {
-    clientX: event.clientX,
-    clientY: event.clientY,
-    screen: pointerPosition(event),
-  });
-}
-
-function forgetTouchPointer(event) {
-  if (event.pointerType === "touch") {
-    state.touchPointers.delete(event.pointerId);
-  }
-}
-
-function getPinchTouchPoints() {
-  if (!state.pinch) return null;
-  const points = state.pinch.pointerIds.map((id) => state.touchPointers.get(id)?.screen);
-  return points.every(Boolean) ? points : null;
-}
-
-function getMidpoint(a, b) {
+function getViewportCenterOnCanvas() {
+  const shellRect = canvasShell.getBoundingClientRect();
+  const svgRect = svg.getBoundingClientRect();
   return {
-    x: (a.x + b.x) / 2,
-    y: (a.y + b.y) / 2,
+    x: shellRect.left + shellRect.width / 2 - svgRect.left,
+    y: shellRect.top + shellRect.height / 2 - svgRect.top,
   };
 }
 
-function startPinchZoom() {
-  const entries = Array.from(state.touchPointers.entries()).slice(0, 2);
-  if (entries.length < 2) return false;
-  const [first, second] = entries;
-  const startDistance = length(sub(first[1].screen, second[1].screen));
-  if (startDistance < 8) return false;
-  const center = getMidpoint(first[1].screen, second[1].screen);
-  state.pinch = {
-    pointerIds: [first[0], second[0]],
-    startDistance,
-    startScale: state.scale,
-    startCenterWorld: screenToWorld(center),
-  };
-  state.pan = null;
-  state.drag = null;
-  state.clickContext = null;
-  state.suppressNextClick = true;
-  return true;
-}
-
-function updatePinchZoom() {
-  const points = getPinchTouchPoints();
-  if (!points) return false;
-  const [first, second] = points;
-  const distance = length(sub(first, second));
-  if (distance < 8) return false;
-  const center = getMidpoint(first, second);
-  const nextScale = clampValue(
-    state.pinch.startScale * (distance / state.pinch.startDistance),
-    MIN_CANVAS_SCALE,
-    MAX_CANVAS_SCALE,
-  );
-  state.scale = nextScale;
+function setCanvasScale(nextScale, anchorScreen = getViewportCenterOnCanvas()) {
+  const scale = clampValue(nextScale, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
+  const anchorWorld = screenToWorld(anchorScreen);
+  state.scale = scale;
   state.offset = {
-    x: center.x - state.pinch.startCenterWorld.x * nextScale,
-    y: center.y - state.pinch.startCenterWorld.y * nextScale,
+    x: anchorScreen.x - anchorWorld.x * scale,
+    y: anchorScreen.y - anchorWorld.y * scale,
   };
   render();
-  return true;
+}
+
+function adjustCanvasScale(delta) {
+  setCanvasScale(state.scale + delta);
 }
 
 function captureSvgPointer(event) {
@@ -1830,11 +1797,6 @@ function placePendingComponent() {
 svg.addEventListener("pointerdown", (event) => {
   if (event.pointerType === "touch") {
     event.preventDefault();
-    rememberTouchPointer(event);
-    captureSvgPointer(event);
-    if (state.pinch || (state.touchPointers.size >= 2 && startPinchZoom())) {
-      return;
-    }
   }
 
   const id = componentIdFromEventTarget(event.target);
@@ -1876,11 +1838,6 @@ svg.addEventListener("pointerdown", (event) => {
 svg.addEventListener("pointermove", (event) => {
   if (event.pointerType === "touch") {
     event.preventDefault();
-    rememberTouchPointer(event);
-    if (state.pinch || (state.touchPointers.size >= 2 && startPinchZoom())) {
-      updatePinchZoom();
-      return;
-    }
   }
 
   if (state.pan?.pointerId === event.pointerId) {
@@ -1909,23 +1866,10 @@ svg.addEventListener("pointermove", (event) => {
 });
 
 svg.addEventListener("pointerup", (event) => {
-  if (state.pinch?.pointerIds.includes(event.pointerId)) {
-    event.preventDefault();
-    state.pinch = null;
-    state.pan = null;
-    state.drag = null;
-    state.clickContext = null;
-    state.suppressNextClick = true;
-    forgetTouchPointer(event);
-    releaseSvgPointer(event);
-    return;
-  }
-
   if (state.pan?.pointerId === event.pointerId) {
     const didMove = state.pan.moved;
     state.pan = null;
     releaseSvgPointer(event);
-    forgetTouchPointer(event);
     if (!didMove && !state.pendingComponentId) {
       state.selectedId = null;
       state.clickContext = null;
@@ -1948,19 +1892,14 @@ svg.addEventListener("pointerup", (event) => {
     }
     state.drag = null;
     releaseSvgPointer(event);
-    forgetTouchPointer(event);
     render();
     return;
   }
 
-  forgetTouchPointer(event);
   releaseSvgPointer(event);
 });
 
 svg.addEventListener("pointercancel", (event) => {
-  if (state.pinch?.pointerIds.includes(event.pointerId)) {
-    state.pinch = null;
-  }
   if (state.pan?.pointerId === event.pointerId) {
     state.pan = null;
   }
@@ -1969,7 +1908,6 @@ svg.addEventListener("pointercancel", (event) => {
     render();
   }
   state.clickContext = null;
-  forgetTouchPointer(event);
   releaseSvgPointer(event);
 });
 
@@ -2094,9 +2032,21 @@ window.addEventListener("keydown", (event) => {
 });
 
 resetView.addEventListener("click", () => {
-  state.scale = 1.55;
+  state.scale = DEFAULT_CANVAS_SCALE;
   state.offset = { x: 54, y: 42 };
   render();
+});
+
+zoomOut.addEventListener("click", () => {
+  adjustCanvasScale(-CANVAS_SCALE_STEP);
+});
+
+zoomIn.addEventListener("click", () => {
+  adjustCanvasScale(CANVAS_SCALE_STEP);
+});
+
+zoomSlider.addEventListener("input", () => {
+  setCanvasScale(Number(zoomSlider.value));
 });
 
 clearAll.addEventListener("click", () => {
