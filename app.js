@@ -46,6 +46,8 @@ const lockStatus = document.querySelector("#lockStatus");
 const readout = document.querySelector("#readout");
 
 const NS = "http://www.w3.org/2000/svg";
+const MIN_CANVAS_SCALE = 0.55;
+const MAX_CANVAS_SCALE = 4.5;
 const presets = {
   "900x600": { width: 900, height: 600, pitch: 25, margin: 12.5 },
   "600x600": { width: 600, height: 600, pitch: 25, margin: 12.5 },
@@ -243,6 +245,8 @@ const state = {
   maxAutoTurnDeg: 180,
   drag: null,
   pan: null,
+  pinch: null,
+  touchPointers: new Map(),
   clickContext: null,
   suppressNextClick: false,
   pendingComponentId: null,
@@ -359,6 +363,10 @@ function mul(point, value) {
 
 function length(point) {
   return Math.hypot(point.x, point.y);
+}
+
+function clampValue(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function normalize(point) {
@@ -1624,9 +1632,93 @@ function pointerPosition(event) {
   };
 }
 
+function rememberTouchPointer(event) {
+  if (event.pointerType !== "touch") return;
+  state.touchPointers.set(event.pointerId, {
+    clientX: event.clientX,
+    clientY: event.clientY,
+    screen: pointerPosition(event),
+  });
+}
+
+function forgetTouchPointer(event) {
+  if (event.pointerType === "touch") {
+    state.touchPointers.delete(event.pointerId);
+  }
+}
+
+function getPinchTouchPoints() {
+  if (!state.pinch) return null;
+  const points = state.pinch.pointerIds.map((id) => state.touchPointers.get(id)?.screen);
+  return points.every(Boolean) ? points : null;
+}
+
+function getMidpoint(a, b) {
+  return {
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+  };
+}
+
+function startPinchZoom() {
+  const entries = Array.from(state.touchPointers.entries()).slice(0, 2);
+  if (entries.length < 2) return false;
+  const [first, second] = entries;
+  const startDistance = length(sub(first[1].screen, second[1].screen));
+  if (startDistance < 8) return false;
+  const center = getMidpoint(first[1].screen, second[1].screen);
+  state.pinch = {
+    pointerIds: [first[0], second[0]],
+    startDistance,
+    startScale: state.scale,
+    startCenterWorld: screenToWorld(center),
+  };
+  state.pan = null;
+  state.drag = null;
+  state.clickContext = null;
+  state.suppressNextClick = true;
+  return true;
+}
+
+function updatePinchZoom() {
+  const points = getPinchTouchPoints();
+  if (!points) return false;
+  const [first, second] = points;
+  const distance = length(sub(first, second));
+  if (distance < 8) return false;
+  const center = getMidpoint(first, second);
+  const nextScale = clampValue(
+    state.pinch.startScale * (distance / state.pinch.startDistance),
+    MIN_CANVAS_SCALE,
+    MAX_CANVAS_SCALE,
+  );
+  state.scale = nextScale;
+  state.offset = {
+    x: center.x - state.pinch.startCenterWorld.x * nextScale,
+    y: center.y - state.pinch.startCenterWorld.y * nextScale,
+  };
+  render();
+  return true;
+}
+
+function captureSvgPointer(event) {
+  if (!svg.setPointerCapture) return;
+  try {
+    svg.setPointerCapture(event.pointerId);
+  } catch {
+    // Synthetic or interrupted pointer streams may not be capturable.
+  }
+}
+
 function releaseSvgPointer(event) {
   if (svg.hasPointerCapture?.(event.pointerId)) {
     svg.releasePointerCapture(event.pointerId);
+  }
+}
+
+function preventCanvasTouchScroll(event) {
+  if (event.cancelable) {
+    event.preventDefault();
   }
 }
 
@@ -1736,6 +1828,15 @@ function placePendingComponent() {
 }
 
 svg.addEventListener("pointerdown", (event) => {
+  if (event.pointerType === "touch") {
+    event.preventDefault();
+    rememberTouchPointer(event);
+    captureSvgPointer(event);
+    if (state.pinch || (state.touchPointers.size >= 2 && startPinchZoom())) {
+      return;
+    }
+  }
+
   const id = componentIdFromEventTarget(event.target);
   if (!id) {
     if (event.pointerType === "touch" || event.pointerType === "pen") {
@@ -1748,7 +1849,7 @@ svg.addEventListener("pointerdown", (event) => {
         startScrollTop: canvasShell.scrollTop,
         moved: false,
       };
-      svg.setPointerCapture(event.pointerId);
+      captureSvgPointer(event);
     }
     return;
   }
@@ -1768,11 +1869,20 @@ svg.addEventListener("pointerdown", (event) => {
     startScreen: screen,
     moved: false,
   };
-  svg.setPointerCapture(event.pointerId);
+  captureSvgPointer(event);
   render();
 });
 
 svg.addEventListener("pointermove", (event) => {
+  if (event.pointerType === "touch") {
+    event.preventDefault();
+    rememberTouchPointer(event);
+    if (state.pinch || (state.touchPointers.size >= 2 && startPinchZoom())) {
+      updatePinchZoom();
+      return;
+    }
+  }
+
   if (state.pan?.pointerId === event.pointerId) {
     event.preventDefault();
     const dx = event.clientX - state.pan.startClientX;
@@ -1799,12 +1909,32 @@ svg.addEventListener("pointermove", (event) => {
 });
 
 svg.addEventListener("pointerup", (event) => {
+  if (state.pinch?.pointerIds.includes(event.pointerId)) {
+    event.preventDefault();
+    state.pinch = null;
+    state.pan = null;
+    state.drag = null;
+    state.clickContext = null;
+    state.suppressNextClick = true;
+    forgetTouchPointer(event);
+    releaseSvgPointer(event);
+    return;
+  }
+
   if (state.pan?.pointerId === event.pointerId) {
-    if (state.pan.moved) {
-      state.suppressNextClick = true;
-    }
+    const didMove = state.pan.moved;
     state.pan = null;
     releaseSvgPointer(event);
+    forgetTouchPointer(event);
+    if (!didMove && !state.pendingComponentId) {
+      state.selectedId = null;
+      state.clickContext = null;
+      render();
+      return;
+    }
+    if (didMove) {
+      state.suppressNextClick = true;
+    }
     return;
   }
   if (state.drag) {
@@ -1818,11 +1948,19 @@ svg.addEventListener("pointerup", (event) => {
     }
     state.drag = null;
     releaseSvgPointer(event);
+    forgetTouchPointer(event);
     render();
+    return;
   }
+
+  forgetTouchPointer(event);
+  releaseSvgPointer(event);
 });
 
 svg.addEventListener("pointercancel", (event) => {
+  if (state.pinch?.pointerIds.includes(event.pointerId)) {
+    state.pinch = null;
+  }
   if (state.pan?.pointerId === event.pointerId) {
     state.pan = null;
   }
@@ -1831,8 +1969,12 @@ svg.addEventListener("pointercancel", (event) => {
     render();
   }
   state.clickContext = null;
+  forgetTouchPointer(event);
   releaseSvgPointer(event);
 });
+
+svg.addEventListener("touchstart", preventCanvasTouchScroll, { passive: false });
+svg.addEventListener("touchmove", preventCanvasTouchScroll, { passive: false });
 
 svg.addEventListener("click", (event) => {
   if (state.suppressNextClick) {
