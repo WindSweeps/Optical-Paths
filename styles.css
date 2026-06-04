@@ -963,7 +963,12 @@ input[type="search"] {
   input[type="number"],
   input[type="search"],
   input[type="text"] {
+    font-size: 16px;
     min-height: 44px;
+  }
+
+  select {
+    font-size: 16px;
   }
 
   input[type="range"] {
@@ -1147,23 +1152,31 @@ input[type="search"] {
   }
 
   .modal-backdrop {
-    align-items: stretch;
-    justify-items: stretch;
-    padding: 0;
+    align-items: center;
+    justify-items: center;
+    padding: 12px;
   }
 
   .picker-dialog {
-    width: 100vw;
-    height: 100dvh;
-    max-height: 100dvh;
-    border: 0;
-    border-radius: 0;
+    width: min(430px, calc(100vw - 24px));
+    height: min(720px, calc(100dvh - 24px));
+    max-height: calc(100dvh - 24px);
+    border: 1px solid #cad4df;
+    border-radius: 8px;
     grid-template-rows: auto auto minmax(0, 1fr) auto;
   }
 
   .picker-header {
     align-items: flex-start;
     padding: 12px 12px 10px;
+  }
+
+  .picker-header > div:first-child {
+    min-width: 0;
+  }
+
+  .picker-header-actions {
+    flex: 0 0 auto;
   }
 
   .picker-header h1 {
@@ -1177,6 +1190,8 @@ input[type="search"] {
   .mobile-picker-confirm {
     display: inline-flex;
     align-items: center;
+    width: auto;
+    white-space: nowrap;
   }
 
   .picker-toolbar {
