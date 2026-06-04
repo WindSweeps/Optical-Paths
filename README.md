@@ -11,6 +11,8 @@ Try the published app: [Optical Paths on GitHub Pages](https://windsweeps.github
 - Draw laboratory optical layouts on common metric breadboards.
 - Snap clamp screws to threaded holes with collision-aware automatic clamp rotation.
 - Trace source, mirror, lens, and beamsplitter paths.
+- Edit component labels, angles, center positions, and delete selected components.
+- Save and reopen local project JSON files, with error placeholders for missing library components.
 - Export the current drawing as SVG or PNG after previewing it.
 - Switch the interface between Chinese and English.
 

@@ -14,8 +14,13 @@ Live app: [https://windsweeps.github.io/Optical-Paths/](https://windsweeps.githu
 - Automatic selection of an available threaded hole with the smallest clamp-angle adjustment
 - Fork-clamp overlap prevention
 - Warning when a post blocks access to a screw while still allowing placement
-- Direct numeric component-angle input
+- Direct numeric component-angle input with three-decimal precision and 1-degree slider steps
+- Direct component-center position display and numeric editing
 - Editable horizontal component labels
+- Selected-component deletion
+- Local project JSON export and import
+- Error placeholders for imported components whose library definitions are missing
+- Visible-hole rendering and hole caching to reduce lag on large breadboards
 - Chinese and English interface toggle with persisted language preference
 - SVG and PNG export preview with local download
 
@@ -48,8 +53,19 @@ Polarization matrices and Gaussian-beam ABCD calculations are not implemented ye
 2. Click **Add Component** and choose an item from the library.
 3. Drag the suspended component while inspecting the automatically selected hole, clamp angle, and mounting status.
 4. Click **Place** to commit the component.
-5. Select a component to edit its label, component angle, clamp angle, or source wavelength.
-6. Click **Export SVG** or **Export PNG**, preview the output, and download the image.
+5. Select a component to edit its label, center position, component angle, clamp angle, or source wavelength, or delete it.
+6. Click **Export Project** to save the current project, or **Import Project** to reopen a local project file.
+7. Click **Export SVG** or **Export PNG**, preview the output, and download the image.
+
+## Project Files
+
+Project files are JSON documents with names such as `optical-layout-2026-06-04.optical-path.json`. They store:
+
+- Breadboard size and current view zoom/pan
+- Component library IDs, labels, center positions, angles, clamp angles, and source wavelengths
+- The current maximum automatic clamp-rotation setting
+
+When importing a project, the app rebuilds components from the currently published component library. If a saved `catalogId` is missing from the current library, that component is shown as a red dashed error placeholder so the project can still open and the missing definition can be located.
 
 ## Run Locally
 

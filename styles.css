@@ -272,6 +272,23 @@ p {
   color: #176a76;
 }
 
+.toolbar-status {
+  padding: 0 14px 8px;
+  border-bottom: 1px solid #d8dee8;
+  background: #ffffff;
+}
+
+.toolbar-status:has(#exportStatus:empty) {
+  display: none;
+}
+
+.toolbar-status #exportStatus {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .language-control {
   display: flex;
   flex-direction: row;
