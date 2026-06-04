@@ -16,6 +16,7 @@ const zoomIn = document.querySelector("#zoomIn");
 const zoomSlider = document.querySelector("#zoomSlider");
 const viewportX = document.querySelector("#viewportX");
 const viewportY = document.querySelector("#viewportY");
+const resizeWorkspace = document.querySelector("#resizeWorkspace");
 const exportPreview = document.querySelector("#exportPreview");
 const closeExportPreview = document.querySelector("#closeExportPreview");
 const cancelExportPreview = document.querySelector("#cancelExportPreview");
@@ -37,6 +38,7 @@ const componentSearch = document.querySelector("#componentSearch");
 const componentTypeFilter = document.querySelector("#componentTypeFilter");
 const componentCatalog = document.querySelector("#componentCatalog");
 const pickerSelectionSummary = document.querySelector("#pickerSelectionSummary");
+const reportIssue = document.querySelector("#reportIssue");
 const inspector = document.querySelector("#inspector");
 const emptyState = document.querySelector("#emptyState");
 const componentLibraryName = document.querySelector("#componentLibraryName");
@@ -66,6 +68,8 @@ const AXIS_CONTROL_SIZE = 44;
 const CANVAS_VIEWPORT_MARGIN = 28;
 const DEFAULT_DRAWING_WIDTH = 720;
 const DEFAULT_DRAWING_HEIGHT = 540;
+const MIN_DRAWING_WIDTH = 260;
+const MIN_DRAWING_HEIGHT = 220;
 const AXIS_LOGICAL_WORKSPACES = 3.2;
 const MAX_BEAM_INTERACTIONS = 24;
 const BEAM_SURFACE_EPSILON_MM = 0.8;
@@ -81,6 +85,8 @@ const translations = {
     documentTitle: "光路图孔位固定原型",
     brandTitle: "光路图绘制",
     brandSubtitle: "孔位固定原型",
+    reportIssue: "报告错误",
+    githubLink: "GitHub 仓库",
     opticalTable: "光学桌",
     tableSize: "桌面尺寸",
     table900x600: "900 x 600 mm 面包板",
@@ -121,6 +127,7 @@ const translations = {
     positionControl: "位置",
     viewportX: "X 轴位置",
     viewportY: "Y 轴位置",
+    resizeWorkspace: "调整工作区范围",
     language: "语言",
     pendingPrefix: "悬置：",
     pendingHelp: "拖动元件预览孔位与压板位置，确认后再置入光路。",
@@ -177,6 +184,8 @@ const translations = {
     documentTitle: "Optical Layout Mounting Prototype",
     brandTitle: "Optical Layout",
     brandSubtitle: "Hole Mounting Prototype",
+    reportIssue: "Report Bug",
+    githubLink: "GitHub Repository",
     opticalTable: "Optical Table",
     tableSize: "Table Size",
     table900x600: "900 x 600 mm Breadboard",
@@ -217,6 +226,7 @@ const translations = {
     positionControl: "Position",
     viewportX: "X Position",
     viewportY: "Y Position",
+    resizeWorkspace: "Resize Workspace",
     language: "Language",
     pendingPrefix: "Pending: ",
     pendingHelp: "Drag the component to preview the hole and clamp positions, then place it into the layout.",
@@ -297,11 +307,13 @@ const state = {
   table: presets["300x300"],
   scale: DEFAULT_CANVAS_SCALE,
   offset: { x: 54, y: 42 },
+  drawingViewport: { width: DEFAULT_DRAWING_WIDTH, height: DEFAULT_DRAWING_HEIGHT },
   components: [],
   selectedId: null,
   maxAutoTurnDeg: 180,
   drag: null,
   pan: null,
+  resize: null,
   clickContext: null,
   suppressNextClick: false,
   pendingComponentId: null,
@@ -373,6 +385,12 @@ function setLocale(locale) {
       `${t(state.exportPreview.formatKey)} · ${(state.exportPreview.blob.size / 1024).toFixed(1)} KB`;
   }
   render();
+}
+
+function updateReportIssueLink() {
+  const subject = encodeURIComponent("Optical Paths Bug Report");
+  const body = encodeURIComponent(`Please describe the bug here.\n\nPage: ${window.location.href}`);
+  reportIssue.href = `mailto:zhangzramo@connect.hku.hk?subject=${subject}&body=${body}`;
 }
 
 function createSvg(tag, attrs = {}) {
@@ -1122,6 +1140,7 @@ function createProjectSnapshot() {
     view: {
       scale: state.scale,
       offset: { ...state.offset },
+      drawingViewport: { ...state.drawingViewport },
       maxAutoTurnDeg: state.maxAutoTurnDeg,
     },
     components: state.components
@@ -1205,12 +1224,17 @@ function loadProjectSnapshot(project) {
     x: Number(project.view?.offset?.x) || 54,
     y: Number(project.view?.offset?.y) || 42,
   };
+  state.drawingViewport = {
+    width: Number(project.view?.drawingViewport?.width) || DEFAULT_DRAWING_WIDTH,
+    height: Number(project.view?.drawingViewport?.height) || DEFAULT_DRAWING_HEIGHT,
+  };
   state.maxAutoTurnDeg = clampValue(Number(project.view?.maxAutoTurnDeg) || 180, 0, 180);
   state.components = project.components.map(componentFromProjectSnapshot);
   state.pendingComponentId = null;
   state.selectedId = state.components[0]?.id ?? null;
   state.drag = null;
   state.pan = null;
+  state.resize = null;
   state.clickContext = null;
   const missingCount = state.components.filter((component) => component.missingCatalog).length;
   render();
@@ -1952,29 +1976,46 @@ function adjustCanvasScale(delta) {
   setCanvasScale(state.scale + delta);
 }
 
-function updateDrawingViewportSize() {
+function getAvailableDrawingViewportSize() {
   const workspaceRect = canvasControls.parentElement.getBoundingClientRect();
   const controlsRect = canvasControls.getBoundingClientRect();
-  const availableWidth = Math.max(
-    260,
-    workspaceRect.right - controlsRect.left - AXIS_CONTROL_SIZE - CANVAS_VIEWPORT_MARGIN,
-  );
-  const availableHeight = Math.max(
-    220,
-    workspaceRect.bottom - controlsRect.top - AXIS_CONTROL_SIZE - CANVAS_VIEWPORT_MARGIN,
-  );
-  const viewportWidth = Math.min(DEFAULT_DRAWING_WIDTH, availableWidth);
-  const viewportHeight = Math.min(DEFAULT_DRAWING_HEIGHT, availableHeight);
-  canvasControls.style.setProperty("--drawing-viewport-width", `${viewportWidth}px`);
-  canvasControls.style.setProperty("--drawing-viewport-height", `${viewportHeight}px`);
+  return {
+    width: Math.max(
+      MIN_DRAWING_WIDTH,
+      workspaceRect.right - controlsRect.left - AXIS_CONTROL_SIZE - CANVAS_VIEWPORT_MARGIN,
+    ),
+    height: Math.max(
+      MIN_DRAWING_HEIGHT,
+      workspaceRect.bottom - controlsRect.top - AXIS_CONTROL_SIZE - CANVAS_VIEWPORT_MARGIN,
+    ),
+  };
+}
+
+function getClampedDrawingViewportSize(size) {
+  const available = getAvailableDrawingViewportSize();
+  return {
+    width: clampValue(size.width, MIN_DRAWING_WIDTH, available.width),
+    height: clampValue(size.height, MIN_DRAWING_HEIGHT, available.height),
+  };
+}
+
+function updateDrawingViewportSize() {
+  const viewport = getClampedDrawingViewportSize(state.drawingViewport);
+  canvasControls.style.setProperty("--drawing-viewport-width", `${viewport.width}px`);
+  canvasControls.style.setProperty("--drawing-viewport-height", `${viewport.height}px`);
   const workspaceStart = (((AXIS_LOGICAL_WORKSPACES - 1) / 2) / AXIS_LOGICAL_WORKSPACES) * 100;
   canvasControls.style.setProperty("--axis-workspace-start", `${workspaceStart}%`);
   canvasControls.style.setProperty("--axis-workspace-end", `${100 - workspaceStart}%`);
-  canvasShell.style.width = `${viewportWidth}px`;
-  canvasShell.style.height = `${viewportHeight}px`;
-  svg.setAttribute("width", viewportWidth);
-  svg.setAttribute("height", viewportHeight);
-  svg.setAttribute("viewBox", `0 0 ${viewportWidth} ${viewportHeight}`);
+  canvasShell.style.width = `${viewport.width}px`;
+  canvasShell.style.height = `${viewport.height}px`;
+  svg.setAttribute("width", viewport.width);
+  svg.setAttribute("height", viewport.height);
+  svg.setAttribute("viewBox", `0 0 ${viewport.width} ${viewport.height}`);
+}
+
+function setDrawingViewportSize(width, height) {
+  state.drawingViewport = getClampedDrawingViewportSize({ width, height });
+  render();
 }
 
 function getDrawingViewportSize() {
@@ -2052,6 +2093,21 @@ function captureSvgPointer(event) {
 function releaseSvgPointer(event) {
   if (svg.hasPointerCapture?.(event.pointerId)) {
     svg.releasePointerCapture(event.pointerId);
+  }
+}
+
+function captureResizePointer(event) {
+  if (!resizeWorkspace.setPointerCapture) return;
+  try {
+    resizeWorkspace.setPointerCapture(event.pointerId);
+  } catch {
+    // Synthetic or interrupted pointer streams may not be capturable.
+  }
+}
+
+function releaseResizePointer(event) {
+  if (resizeWorkspace.hasPointerCapture?.(event.pointerId)) {
+    resizeWorkspace.releasePointerCapture(event.pointerId);
   }
 }
 
@@ -2165,6 +2221,41 @@ function placePendingComponent() {
   state.selectedId = pending.id;
   render();
 }
+
+resizeWorkspace.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  const viewport = getDrawingViewportSize();
+  state.resize = {
+    pointerId: event.pointerId,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    startWidth: viewport.width,
+    startHeight: viewport.height,
+  };
+  captureResizePointer(event);
+});
+
+resizeWorkspace.addEventListener("pointermove", (event) => {
+  if (!state.resize || state.resize.pointerId !== event.pointerId) return;
+  event.preventDefault();
+  setDrawingViewportSize(
+    state.resize.startWidth + event.clientX - state.resize.startClientX,
+    state.resize.startHeight + event.clientY - state.resize.startClientY,
+  );
+});
+
+resizeWorkspace.addEventListener("pointerup", (event) => {
+  if (state.resize?.pointerId !== event.pointerId) return;
+  state.resize = null;
+  releaseResizePointer(event);
+});
+
+resizeWorkspace.addEventListener("pointercancel", (event) => {
+  if (state.resize?.pointerId === event.pointerId) {
+    state.resize = null;
+  }
+  releaseResizePointer(event);
+});
 
 svg.addEventListener("pointerdown", (event) => {
   if (event.pointerType === "touch") {
@@ -2501,6 +2592,7 @@ languageSelect.addEventListener("change", () => {
 });
 
 applyStaticTranslations();
+updateReportIssueLink();
 state.components.push(makeComponent(catalog.find((item) => item.id === "laser-source")));
 state.components.push({
   ...makeComponent(catalog.find((item) => item.id === "mirror-mount")),

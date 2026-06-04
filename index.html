@@ -4,17 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>光路图孔位固定原型</title>
-    <link rel="stylesheet" href="./styles.css?v=26" />
+    <link rel="stylesheet" href="./styles.css?v=30" />
   </head>
   <body>
     <main class="app">
       <aside class="sidebar">
         <div class="brand">
-          <strong data-i18n="brandTitle">光路图绘制</strong>
+          <div class="brand-row">
+            <strong data-i18n="brandTitle">光路图绘制</strong>
+            <a
+              id="reportIssue"
+              class="report-issue"
+              href="mailto:zhangzramo@connect.hku.hk?subject=Optical%20Paths%20Bug%20Report&body=Please%20describe%20the%20bug%20here.%0A%0APage%3A%20"
+              data-i18n="reportIssue"
+            >报告错误</a>
+          </div>
           <span data-i18n="brandSubtitle">孔位固定原型</span>
+          <a
+            class="brand-link"
+            href="https://github.com/WindSweeps/Optical-Paths"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-i18n="githubLink"
+          >GitHub 仓库</a>
         </div>
 
-        <section>
+        <section class="table-panel">
           <h2 data-i18n="opticalTable">光学桌</h2>
           <label>
             <span data-i18n="tableSize">桌面尺寸</span>
@@ -32,12 +47,12 @@
           </div>
         </section>
 
-        <section>
+        <section class="component-library-panel">
           <h2 data-i18n="componentLibrary">元件库</h2>
           <button id="openComponentPicker" class="primary-button" type="button" data-i18n="addComponent">添加元件</button>
         </section>
 
-        <section>
+        <section class="selected-component-panel">
           <h2 data-i18n="selectedComponent">选中元件</h2>
           <div id="emptyState" class="empty" data-i18n="emptyInspector">点击元件后编辑固定方式</div>
           <div id="inspector" class="inspector" hidden>
@@ -89,14 +104,14 @@
           </div>
         </section>
 
-        <section>
+        <section class="mounting-rules-panel">
           <h2 data-i18n="mountingRules">固定规则</h2>
           <p data-i18n="mountingRulesText">
             拖动元件后压板会自动选择最小转角的可用孔位。压板之间不能重合；螺丝被柱子挡住时仍可固定，但会显示警告。
           </p>
         </section>
 
-        <section>
+        <section class="optical-rules-panel">
           <h2 data-i18n="opticalRules">光路规则</h2>
           <p data-i18n="opticalRulesText">
             光源沿元件角度发射光线。光线碰到反射镜后按入射角等于反射角反射；碰到分束立方时同时生成反射与透射分支。
@@ -155,6 +170,7 @@
             <span aria-hidden="true">Y</span>
             <input id="viewportY" type="range" min="0" max="0" step="1" value="0" aria-label="Y 轴位置" data-i18n-aria-label="viewportY" />
           </label>
+          <button id="resizeWorkspace" class="resize-workspace" type="button" aria-label="调整工作区范围" data-i18n-aria-label="resizeWorkspace"></button>
         </div>
       </section>
     </main>
@@ -217,6 +233,6 @@
     </div>
 
     <script src="./component-library.js?v=11"></script>
-    <script src="./app.js?v=50"></script>
+    <script src="./app.js?v=53"></script>
   </body>
 </html>
