@@ -21,6 +21,15 @@ html {
   display: none !important;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 body {
   margin: 0;
   height: 100%;
@@ -539,6 +548,18 @@ p {
   fill: #dee8f6;
   stroke: #375a7f;
   stroke-width: 1.5;
+}
+
+.missing-component-body {
+  fill: #fff1f0;
+  stroke: #d92d20;
+  stroke-dasharray: 5 3;
+}
+
+.missing-mark {
+  stroke: #d92d20;
+  stroke-width: 2.4;
+  stroke-linecap: round;
 }
 
 .post {

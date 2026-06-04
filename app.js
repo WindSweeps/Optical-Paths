@@ -5,6 +5,9 @@ const tablePreset = document.querySelector("#tablePreset");
 const openComponentPicker = document.querySelector("#openComponentPicker");
 const resetView = document.querySelector("#resetView");
 const clearAll = document.querySelector("#clearAll");
+const exportProject = document.querySelector("#exportProject");
+const importProject = document.querySelector("#importProject");
+const projectFileInput = document.querySelector("#projectFileInput");
 const exportSvg = document.querySelector("#exportSvg");
 const exportPng = document.querySelector("#exportPng");
 const exportStatus = document.querySelector("#exportStatus");
@@ -107,6 +110,8 @@ const translations = {
     opticalRulesText: "光源沿元件角度发射光线。光线碰到反射镜后按入射角等于反射角反射；碰到分束立方时同时生成反射与透射分支。",
     resetView: "重置视图",
     clearAll: "清空元件",
+    exportProject: "导出工程",
+    importProject: "读取工程",
     exportSvg: "导出 SVG",
     exportPng: "导出 PNG",
     zoomControl: "缩放",
@@ -144,6 +149,11 @@ const translations = {
     thumbnailLabel: "{name} 缩略图",
     downloaded: "已下载 {filename}",
     previewReady: "已生成 {filename} 预览",
+    projectExported: "已导出 {filename}",
+    projectImported: "已读取工程，包含 {count} 个元件。",
+    projectImportedWithMissing: "已读取工程，{missing} 个元件库定义缺失，已用错误代替体显示。",
+    projectImportFailed: "工程文件读取失败",
+    missingComponentName: "缺失元件：{id}",
     svgFormat: "SVG 矢量图",
     pngFormat: "PNG 图片",
     generatingPng: "正在生成 PNG 预览...",
@@ -196,6 +206,8 @@ const translations = {
     opticalRulesText: "Sources emit along the component angle. Mirrors reflect with equal angles of incidence and reflection. Beamsplitter cubes generate reflected and transmitted branches.",
     resetView: "Reset View",
     clearAll: "Clear Components",
+    exportProject: "Export Project",
+    importProject: "Import Project",
     exportSvg: "Export SVG",
     exportPng: "Export PNG",
     zoomControl: "Zoom",
@@ -233,6 +245,11 @@ const translations = {
     thumbnailLabel: "{name} thumbnail",
     downloaded: "Downloaded {filename}",
     previewReady: "Generated preview for {filename}",
+    projectExported: "Exported {filename}",
+    projectImported: "Imported project with {count} components.",
+    projectImportedWithMissing: "Imported project with {missing} missing library definitions shown as error placeholders.",
+    projectImportFailed: "Project file import failed",
+    missingComponentName: "Missing component: {id}",
     svgFormat: "SVG vector image",
     pngFormat: "PNG image",
     generatingPng: "Generating PNG preview...",
@@ -290,6 +307,7 @@ const state = {
   pendingComponentId: null,
   pickerSelectedCatalogId: null,
   exportPreview: null,
+  holeCache: null,
   locale: localStorage.getItem("optical-layout-locale") === "en" ? "en" : "zh",
 };
 
@@ -509,12 +527,15 @@ function clampLocalToWorld(component, clamp, localPoint) {
 }
 
 function generateHoles(table) {
+  const cacheKey = `${table.width}:${table.height}:${table.pitch}:${table.margin}`;
+  if (state.holeCache?.key === cacheKey) return state.holeCache.holes;
   const holes = [];
   for (let x = table.margin; x <= table.width - table.margin; x += table.pitch) {
     for (let y = table.margin; y <= table.height - table.margin; y += table.pitch) {
       holes.push({ x, y });
     }
   }
+  state.holeCache = { key: cacheKey, holes };
   return holes;
 }
 
@@ -712,28 +733,27 @@ function evaluateClamp(component) {
       const angleDelta = normalizeAngleDeg(effectiveClampRotation - clamp.rotation);
       const holeInClamp = rotatePoint(fromPivot, -effectiveTotalRotation);
       const slotDistance = distancePointToSegment(holeInClamp, clamp.slotStart, clamp.slotEnd);
-      const clampOverlap = clampCollidesWithOtherClamps(component, effectiveClampRotation);
-      const screwBlocked = screwBlockedBySupport(hole);
+      const possible =
+        Math.abs(angleDelta) <= state.maxAutoTurnDeg &&
+        slotDistance.distance <= 0.25 &&
+        slotDistance.t >= 0 &&
+        slotDistance.t <= 1;
+      if (!possible) return null;
 
       return {
         hole,
         angleDelta,
         effectiveClampRotation,
-        clampOverlap,
-        screwBlocked,
         ...slotDistance,
       };
     })
-    .filter(Boolean)
-    .filter((candidate) => {
-      return (
-        Math.abs(candidate.angleDelta) <= state.maxAutoTurnDeg &&
-        candidate.distance <= 0.25 &&
-        candidate.t >= 0 &&
-        candidate.t <= 1
-      );
-    });
+    .filter(Boolean);
   const candidates = rawCandidates
+    .map((candidate) => ({
+      ...candidate,
+      clampOverlap: clampCollidesWithOtherClamps(component, candidate.effectiveClampRotation),
+      screwBlocked: screwBlockedBySupport(candidate.hole),
+    }))
     .filter((candidate) => !candidate.clampOverlap)
     .sort((a, b) => {
       if (a.screwBlocked !== b.screwBlocked) return Number(a.screwBlocked) - Number(b.screwBlocked);
@@ -856,6 +876,45 @@ function makeComponent(definition, options = {}) {
     },
     optics: structuredClone(definition.optics),
     wavelengthNm: definition.optics.wavelengthNm,
+  };
+}
+
+function makeMissingComponent(snapshot) {
+  const missingId = snapshot.catalogId ?? snapshot.libraryId ?? "unknown";
+  const label = snapshot.label ?? t("missingComponentName", { id: missingId });
+  return {
+    id: crypto.randomUUID(),
+    catalogId: missingId,
+    missingCatalog: true,
+    name: label,
+    label,
+    labelIsDefault: false,
+    type: "missing",
+    typeLabel: "Missing Component",
+    visualKind: "missing",
+    placementState: snapshot.placementState === "pending" ? "pending" : "placed",
+    needsClampResolve: true,
+    position: { x: Number(snapshot.position?.x) || 0, y: Number(snapshot.position?.y) || 0 },
+    rotation: Number(snapshot.rotation) || 0,
+    size: {
+      width: Number(snapshot.size?.width) || 34,
+      height: Number(snapshot.size?.height) || 34,
+    },
+    post: {
+      centerX: Number(snapshot.post?.centerX) || 0,
+      centerY: Number(snapshot.post?.centerY) || 0,
+      diameter: Number(snapshot.post?.diameter) || 18,
+    },
+    clamp: {
+      width: Number(snapshot.clamp?.width) || 12,
+      forkOuterDiameter: Number(snapshot.clamp?.forkOuterDiameter) || 30,
+      forkClearanceDiameter: Number(snapshot.clamp?.forkClearanceDiameter) || 20,
+      endLength: Number(snapshot.clamp?.endLength) || 6,
+      slotStart: snapshot.clamp?.slotStart ?? { x: 10, y: 0 },
+      slotEnd: snapshot.clamp?.slotEnd ?? { x: 45, y: 0 },
+      rotation: Number(snapshot.clamp?.rotation) || 0,
+    },
+    optics: { behavior: "none" },
   };
 }
 
@@ -1052,6 +1111,125 @@ function downloadBlob(filename, blob) {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
+function createProjectSnapshot() {
+  return {
+    schemaVersion: 1,
+    app: "optical-layout-prototype",
+    exportedAt: new Date().toISOString(),
+    libraryVersion: publishedLibrary.version ?? null,
+    tablePreset: tablePreset.value,
+    table: { ...state.table },
+    view: {
+      scale: state.scale,
+      offset: { ...state.offset },
+      maxAutoTurnDeg: state.maxAutoTurnDeg,
+    },
+    components: state.components
+      .filter((component) => component.placementState === "placed")
+      .map((component) => ({
+        catalogId: component.catalogId,
+        missingCatalog: Boolean(component.missingCatalog),
+        label: component.label,
+        labelIsDefault: component.labelIsDefault,
+        position: { ...component.position },
+        rotation: component.rotation,
+        clampRotation: component.clamp.rotation,
+        wavelengthNm: component.wavelengthNm,
+        size: { ...component.size },
+        post: { ...component.post },
+        clamp: {
+          width: component.clamp.width,
+          forkOuterDiameter: component.clamp.forkOuterDiameter,
+          forkClearanceDiameter: component.clamp.forkClearanceDiameter,
+          endLength: component.clamp.endLength,
+          slotStart: { ...component.clamp.slotStart },
+          slotEnd: { ...component.clamp.slotEnd },
+          rotation: component.clamp.rotation,
+        },
+      })),
+  };
+}
+
+function exportProjectFile() {
+  const filename = `optical-layout-${new Date().toISOString().slice(0, 10)}.optical-path.json`;
+  const blob = new Blob([JSON.stringify(createProjectSnapshot(), null, 2)], {
+    type: "application/json;charset=utf-8",
+  });
+  downloadBlob(filename, blob);
+  exportStatus.textContent = t("projectExported", { filename });
+}
+
+function componentFromProjectSnapshot(snapshot) {
+  const definition = catalog.find((item) => item.id === snapshot.catalogId);
+  const component = definition ? makeComponent(definition) : makeMissingComponent(snapshot);
+  component.label = snapshot.label ?? component.label;
+  component.labelIsDefault = Boolean(snapshot.labelIsDefault);
+  component.position = {
+    x: Number(snapshot.position?.x) || 0,
+    y: Number(snapshot.position?.y) || 0,
+  };
+  component.rotation = clampComponentRotation(Number(snapshot.rotation) || 0);
+  if (Number.isFinite(Number(snapshot.clampRotation))) {
+    component.clamp.rotation = clampComponentRotation(Number(snapshot.clampRotation));
+  } else if (Number.isFinite(Number(snapshot.clamp?.rotation))) {
+    component.clamp.rotation = clampComponentRotation(Number(snapshot.clamp.rotation));
+  }
+  if (Number.isFinite(Number(snapshot.wavelengthNm))) {
+    component.wavelengthNm = Number(snapshot.wavelengthNm);
+  }
+  component.placementState = "placed";
+  component.needsClampResolve = true;
+  component.resolvedClamp = null;
+  return component;
+}
+
+function loadProjectSnapshot(project) {
+  if (!project || !Array.isArray(project.components)) {
+    throw new Error("Invalid project file");
+  }
+  const presetKey = project.tablePreset && presets[project.tablePreset] ? project.tablePreset : null;
+  if (presetKey) {
+    tablePreset.value = presetKey;
+    state.table = presets[presetKey];
+  } else if (project.table?.width && project.table?.height && project.table?.pitch && project.table?.margin) {
+    state.table = {
+      width: Number(project.table.width),
+      height: Number(project.table.height),
+      pitch: Number(project.table.pitch),
+      margin: Number(project.table.margin),
+    };
+  }
+  state.holeCache = null;
+  state.scale = clampValue(Number(project.view?.scale) || DEFAULT_CANVAS_SCALE, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
+  state.offset = {
+    x: Number(project.view?.offset?.x) || 54,
+    y: Number(project.view?.offset?.y) || 42,
+  };
+  state.maxAutoTurnDeg = clampValue(Number(project.view?.maxAutoTurnDeg) || 180, 0, 180);
+  state.components = project.components.map(componentFromProjectSnapshot);
+  state.pendingComponentId = null;
+  state.selectedId = state.components[0]?.id ?? null;
+  state.drag = null;
+  state.pan = null;
+  state.clickContext = null;
+  const missingCount = state.components.filter((component) => component.missingCatalog).length;
+  render();
+  exportStatus.textContent = missingCount > 0
+    ? t("projectImportedWithMissing", { missing: missingCount })
+    : t("projectImported", { count: state.components.length });
+}
+
+async function importProjectFile(file) {
+  if (!file) return;
+  try {
+    loadProjectSnapshot(JSON.parse(await file.text()));
+  } catch {
+    exportStatus.textContent = t("projectImportFailed");
+  } finally {
+    projectFileInput.value = "";
+  }
+}
+
 function closeExportDialog() {
   if (state.exportPreview?.url) URL.revokeObjectURL(state.exportPreview.url);
   state.exportPreview = null;
@@ -1160,8 +1338,18 @@ function renderTable() {
 
   const selected = getSelected();
   const selectedClamp = selected ? getStoredClampResult(selected) : null;
+  const viewport = getDrawingViewportSize();
+  const holeMargin = 10;
   generateHoles(state.table).forEach((hole) => {
     const screen = worldToScreen(hole);
+    if (
+      screen.x < -holeMargin ||
+      screen.x > viewport.width + holeMargin ||
+      screen.y < -holeMargin ||
+      screen.y > viewport.height + holeMargin
+    ) {
+      return;
+    }
     const isCandidate =
       selectedClamp?.candidate &&
       Math.abs(selectedClamp.candidate.x - hole.x) < 0.001 &&
@@ -1218,7 +1406,7 @@ function renderComponent(component) {
   }
   group.appendChild(
     createSvg("rect", {
-      class: "component-body",
+      class: component.missingCatalog ? "component-body missing-component-body" : "component-body",
       x: -width / 2,
       y: -height / 2,
       width,
@@ -1226,7 +1414,26 @@ function renderComponent(component) {
       rx: 3,
     }),
   );
-  if (component.visualKind === "source") {
+  if (component.visualKind === "missing") {
+    group.appendChild(
+      createSvg("line", {
+        class: "missing-mark",
+        x1: -width / 2 + 6,
+        y1: -height / 2 + 6,
+        x2: width / 2 - 6,
+        y2: height / 2 - 6,
+      }),
+    );
+    group.appendChild(
+      createSvg("line", {
+        class: "missing-mark",
+        x1: width / 2 - 6,
+        y1: -height / 2 + 6,
+        x2: -width / 2 + 6,
+        y2: height / 2 - 6,
+      }),
+    );
+  } else if (component.visualKind === "source") {
     group.appendChild(
       createSvg("circle", {
         class: "source-aperture",
@@ -2184,6 +2391,7 @@ deleteComponent.addEventListener("click", removeSelectedComponent);
 
 tablePreset.addEventListener("change", () => {
   state.table = presets[tablePreset.value];
+  state.holeCache = null;
   state.components.forEach((component) => {
     component.needsClampResolve = true;
   });
@@ -2261,6 +2469,14 @@ clearAll.addEventListener("click", () => {
   state.selectedId = null;
   state.pendingComponentId = null;
   render();
+});
+
+exportProject.addEventListener("click", exportProjectFile);
+importProject.addEventListener("click", () => {
+  projectFileInput.click();
+});
+projectFileInput.addEventListener("change", () => {
+  importProjectFile(projectFileInput.files?.[0]);
 });
 
 exportSvg.addEventListener("click", () => {

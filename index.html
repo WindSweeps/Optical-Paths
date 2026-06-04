@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>光路图孔位固定原型</title>
-    <link rel="stylesheet" href="./styles.css?v=24" />
+    <link rel="stylesheet" href="./styles.css?v=25" />
   </head>
   <body>
     <main class="app">
@@ -108,6 +108,9 @@
         <div class="toolbar">
           <button id="resetView" type="button" data-i18n="resetView">重置视图</button>
           <button id="clearAll" type="button" data-i18n="clearAll">清空元件</button>
+          <button id="exportProject" type="button" data-i18n="exportProject">导出工程</button>
+          <button id="importProject" type="button" data-i18n="importProject">读取工程</button>
+          <input id="projectFileInput" class="visually-hidden" type="file" accept=".json,.optical-path.json,application/json" />
           <button id="exportSvg" type="button" data-i18n="exportSvg">导出 SVG</button>
           <button id="exportPng" type="button" data-i18n="exportPng">导出 PNG</button>
           <span id="exportStatus" role="status"></span>
@@ -212,6 +215,6 @@
     </div>
 
     <script src="./component-library.js?v=11"></script>
-    <script src="./app.js?v=47"></script>
+    <script src="./app.js?v=49"></script>
   </body>
 </html>
