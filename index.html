@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>光路图孔位固定原型</title>
-    <link rel="stylesheet" href="./styles.css?v=22" />
+    <link rel="stylesheet" href="./styles.css?v=23" />
   </head>
   <body>
     <main class="app">
@@ -71,6 +71,7 @@
               <input id="wavelengthInput" type="number" min="200" max="2000" step="1" value="650" />
               <output id="wavelengthValue">650 nm</output>
             </label>
+            <button id="deleteComponent" class="danger-button" type="button" data-i18n="deleteComponent">删除元件</button>
             <div id="lockStatus" class="status"></div>
           </div>
         </section>
@@ -198,6 +199,6 @@
     </div>
 
     <script src="./component-library.js?v=11"></script>
-    <script src="./app.js?v=43"></script>
+    <script src="./app.js?v=45"></script>
   </body>
 </html>

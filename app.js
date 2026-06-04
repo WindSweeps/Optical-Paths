@@ -48,6 +48,7 @@ const clampFlexValue = document.querySelector("#clampFlexValue");
 const wavelengthControls = document.querySelector("#wavelengthControls");
 const wavelengthInput = document.querySelector("#wavelengthInput");
 const wavelengthValue = document.querySelector("#wavelengthValue");
+const deleteComponent = document.querySelector("#deleteComponent");
 const lockStatus = document.querySelector("#lockStatus");
 const readout = document.querySelector("#readout");
 
@@ -61,6 +62,8 @@ const CANVAS_VIEWPORT_MARGIN = 28;
 const DEFAULT_DRAWING_WIDTH = 720;
 const DEFAULT_DRAWING_HEIGHT = 540;
 const AXIS_LOGICAL_WORKSPACES = 3.2;
+const MAX_BEAM_INTERACTIONS = 24;
+const BEAM_SURFACE_EPSILON_MM = 0.8;
 const presets = {
   "900x600": { width: 900, height: 600, pitch: 25, margin: 12.5 },
   "600x600": { width: 600, height: 600, pitch: 25, margin: 12.5 },
@@ -92,6 +95,7 @@ const translations = {
     clampRotation: "压板角度",
     maxAutoTurn: "最大自动转角",
     sourceWavelength: "光源波长",
+    deleteComponent: "删除元件",
     mountingRules: "固定规则",
     mountingRulesText: "拖动元件后压板会自动选择最小转角的可用孔位。压板之间不能重合；螺丝被柱子挡住时仍可固定，但会显示警告。",
     opticalRules: "光路规则",
@@ -177,6 +181,7 @@ const translations = {
     clampRotation: "Clamp Angle",
     maxAutoTurn: "Maximum Auto Rotation",
     sourceWavelength: "Source Wavelength",
+    deleteComponent: "Delete Component",
     mountingRules: "Mounting Rules",
     mountingRulesText: "After dragging a component, the clamp automatically selects an available hole with the smallest rotation. Clamps cannot overlap. A blocked screw is allowed but shown as a warning.",
     opticalRules: "Optical Rules",
@@ -1460,17 +1465,21 @@ function traceBeam(source) {
     .filter((item) => item.optics.surface && item.placementState === "placed")
     .map(getInteractionSegment);
   const initialRay = getSourceRay(source);
-  const rays = [{ ...initialRay, kind: "incoming", usedHits: new Set(), steps: 0 }];
+  const rays = [{ ...initialRay, kind: "incoming", lastHitId: null, steps: 0 }];
 
   while (rays.length > 0) {
     const ray = rays.shift();
-    const { origin, direction, wavelengthNm, usedHits, steps, kind } = ray;
+    const { origin, direction, wavelengthNm, lastHitId, steps, kind } = ray;
     const hits = interactions
       .map((interaction) => ({
         interaction,
         hit: raySegmentIntersection(origin, direction, interaction.start, interaction.end),
       }))
-      .filter((entry) => entry.hit && !usedHits.has(entry.interaction.component.id))
+      .filter((entry) => {
+        if (!entry.hit) return false;
+        if (entry.interaction.component.id !== lastHitId) return true;
+        return entry.hit.rayT > BEAM_SURFACE_EPSILON_MM * 2;
+      })
       .sort((a, b) => a.hit.rayT - b.hit.rayT);
 
     const nearest = hits[0];
@@ -1486,9 +1495,7 @@ function traceBeam(source) {
     }
 
     segments.push({ start: origin, end: nearest.hit.point, wavelengthNm, kind });
-    if (steps >= 3) continue;
-    const nextUsedHits = new Set(usedHits);
-    nextUsedHits.add(nearest.interaction.component.id);
+    if (steps >= MAX_BEAM_INTERACTIONS) continue;
     const nextBeams = applyOpticalInteraction(nearest.interaction.component, {
       direction,
       wavelengthNm,
@@ -1498,8 +1505,8 @@ function traceBeam(source) {
     nextBeams.forEach((nextBeam) => {
       rays.push({
         ...nextBeam,
-        origin: add(nearest.hit.point, mul(nextBeam.direction, 0.8)),
-        usedHits: new Set(nextUsedHits),
+        origin: add(nearest.hit.point, mul(nextBeam.direction, BEAM_SURFACE_EPSILON_MM)),
+        lastHitId: nearest.interaction.component.id,
         steps: steps + 1,
       });
     });
@@ -1647,6 +1654,21 @@ function renderPlacementUi() {
 
 function getSelected() {
   return state.components.find((item) => item.id === state.selectedId) ?? null;
+}
+
+function removeSelectedComponent() {
+  const selected = getSelected();
+  if (!selected) return;
+  state.components = state.components.filter((component) => component.id !== selected.id);
+  if (state.pendingComponentId === selected.id) state.pendingComponentId = null;
+  state.selectedId = null;
+  state.dragging = null;
+  state.clickContext = null;
+  render();
+}
+
+function isTypingTarget(target) {
+  return target instanceof Element && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
 }
 
 function pointerPosition(event) {
@@ -2099,6 +2121,8 @@ wavelengthInput.addEventListener("input", () => {
   render();
 });
 
+deleteComponent.addEventListener("click", removeSelectedComponent);
+
 tablePreset.addEventListener("change", () => {
   state.table = presets[tablePreset.value];
   state.components.forEach((component) => {
@@ -2130,6 +2154,16 @@ componentPicker.addEventListener("click", (event) => {
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !componentPicker.hidden) closePicker();
   if (event.key === "Escape" && !exportPreview.hidden) closeExportDialog();
+  const deleteShortcut =
+    (event.key === "Delete" || event.key === "Backspace") &&
+    getSelected() &&
+    componentPicker.hidden &&
+    exportPreview.hidden &&
+    !isTypingTarget(event.target);
+  if (deleteShortcut) {
+    event.preventDefault();
+    removeSelectedComponent();
+  }
 });
 
 window.addEventListener("resize", () => {

@@ -122,6 +122,17 @@ button:disabled {
   background: #125965;
 }
 
+.danger-button {
+  border-color: #f4b2ac;
+  background: #fff5f4;
+  color: #b42318;
+}
+
+.danger-button:hover {
+  border-color: #e67a73;
+  background: #fee4e2;
+}
+
 input[type="range"] {
   width: 100%;
 }
