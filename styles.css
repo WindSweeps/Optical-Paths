@@ -87,6 +87,24 @@ label {
   color: #344054;
 }
 
+.field-group {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  color: #344054;
+}
+
+.coordinate-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.axis-input {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
 select,
 button,
 input[type="number"],

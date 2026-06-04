@@ -38,6 +38,8 @@ const inspector = document.querySelector("#inspector");
 const emptyState = document.querySelector("#emptyState");
 const componentLibraryName = document.querySelector("#componentLibraryName");
 const componentLabel = document.querySelector("#componentLabel");
+const componentPositionX = document.querySelector("#componentPositionX");
+const componentPositionY = document.querySelector("#componentPositionY");
 const componentRotation = document.querySelector("#componentRotation");
 const componentRotationNumber = document.querySelector("#componentRotationNumber");
 const componentRotationValue = document.querySelector("#componentRotationValue");
@@ -91,6 +93,9 @@ const translations = {
     emptyInspector: "点击元件后编辑固定方式",
     libraryName: "元件库名称：",
     componentLabel: "元件标签",
+    componentCenter: "元件中心位置",
+    componentPositionX: "元件中心 X 位置",
+    componentPositionY: "元件中心 Y 位置",
     componentRotation: "元件角度",
     clampRotation: "压板角度",
     maxAutoTurn: "最大自动转角",
@@ -177,6 +182,9 @@ const translations = {
     emptyInspector: "Select a component to edit its mounting",
     libraryName: "Library name: ",
     componentLabel: "Component Label",
+    componentCenter: "Component Center Position",
+    componentPositionX: "Component center X position",
+    componentPositionY: "Component center Y position",
     componentRotation: "Component Angle",
     clampRotation: "Clamp Angle",
     maxAutoTurn: "Maximum Auto Rotation",
@@ -1597,9 +1605,17 @@ function renderInspector() {
 
   componentLibraryName.textContent = getComponentLibraryName(selected);
   componentLabel.value = selected.label ?? selected.name;
-  componentRotation.value = selected.rotation;
-  componentRotationNumber.value = Math.round(selected.rotation);
-  componentRotationValue.textContent = `${Math.round(selected.rotation)} deg`;
+  if (document.activeElement !== componentPositionX) {
+    componentPositionX.value = formatMmInputValue(selected.position.x);
+  }
+  if (document.activeElement !== componentPositionY) {
+    componentPositionY.value = formatMmInputValue(selected.position.y);
+  }
+  componentRotation.value = Math.round(selected.rotation);
+  if (document.activeElement !== componentRotationNumber) {
+    componentRotationNumber.value = formatAngleInputValue(selected.rotation);
+  }
+  componentRotationValue.textContent = `${formatAngleInputValue(selected.rotation)} deg`;
   clampRotation.value = selected.clamp.rotation;
   clampRotationValue.textContent = `${Math.round(selected.clamp.rotation)} deg`;
   clampFlex.value = state.maxAutoTurnDeg;
@@ -1669,6 +1685,32 @@ function removeSelectedComponent() {
 
 function isTypingTarget(target) {
   return target instanceof Element && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+}
+
+function formatMmInputValue(value) {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(3)));
+}
+
+function formatAngleInputValue(value) {
+  return String(Number(value.toFixed(3)));
+}
+
+function clampComponentRotation(value) {
+  return Number(formatAngleInputValue(clampValue(value, -180, 180)));
+}
+
+function updateSelectedPosition(axis, rawValue) {
+  const selected = getSelected();
+  if (!selected) return;
+  if (rawValue === "" || rawValue === "-") return;
+  const numericValue = Number(rawValue);
+  if (!Number.isFinite(numericValue)) return;
+  selected.position = {
+    ...selected.position,
+    [axis]: numericValue,
+  };
+  selected.needsClampResolve = true;
+  render();
 }
 
 function pointerPosition(event) {
@@ -2079,10 +2121,18 @@ componentLabel.addEventListener("input", () => {
   updateRenderedLabel(selected);
 });
 
+componentPositionX.addEventListener("input", () => {
+  updateSelectedPosition("x", componentPositionX.value);
+});
+
+componentPositionY.addEventListener("input", () => {
+  updateSelectedPosition("y", componentPositionY.value);
+});
+
 componentRotation.addEventListener("input", () => {
   const selected = getSelected();
   if (!selected) return;
-  selected.rotation = Number(componentRotation.value);
+  selected.rotation = Math.round(Number(componentRotation.value));
   selected.needsClampResolve = true;
   render();
 });
@@ -2091,12 +2141,21 @@ componentRotationNumber.addEventListener("input", () => {
   const selected = getSelected();
   if (!selected) return;
   const rawValue = componentRotationNumber.value;
-  if (rawValue === "" || rawValue === "-") return;
+  if (rawValue === "" || rawValue === "-" || rawValue === "." || rawValue === "-.") return;
   const numericValue = Number(rawValue);
   if (!Number.isFinite(numericValue)) return;
-  selected.rotation = Math.max(-180, Math.min(180, numericValue));
+  selected.rotation = clampComponentRotation(numericValue);
+  if (numericValue !== selected.rotation) {
+    componentRotationNumber.value = formatAngleInputValue(selected.rotation);
+  }
   selected.needsClampResolve = true;
   render();
+});
+
+componentRotationNumber.addEventListener("blur", () => {
+  const selected = getSelected();
+  if (!selected) return;
+  componentRotationNumber.value = formatAngleInputValue(selected.rotation);
 });
 
 clampRotation.addEventListener("input", () => {
