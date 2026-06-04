@@ -34,6 +34,7 @@ const componentPicker = document.querySelector("#componentPicker");
 const closeComponentPicker = document.querySelector("#closeComponentPicker");
 const cancelComponentPicker = document.querySelector("#cancelComponentPicker");
 const confirmComponentPicker = document.querySelector("#confirmComponentPicker");
+const confirmComponentPickerTop = document.querySelector("#confirmComponentPickerTop");
 const componentSearch = document.querySelector("#componentSearch");
 const componentTypeFilter = document.querySelector("#componentTypeFilter");
 const componentCatalog = document.querySelector("#componentCatalog");
@@ -137,6 +138,7 @@ const translations = {
     canvasLabel: "光学桌画布",
     pickerTitle: "选择光学元件",
     pickerSubtitle: "从元件库中选择一个器件加入画布。",
+    addSelectedComponent: "添加元件",
     close: "关闭",
     searchComponent: "搜索元件",
     searchPlaceholder: "输入名称",
@@ -236,6 +238,7 @@ const translations = {
     canvasLabel: "Optical table canvas",
     pickerTitle: "Select Optical Component",
     pickerSubtitle: "Choose a component from the library to add it to the canvas.",
+    addSelectedComponent: "Add Component",
     close: "Close",
     searchComponent: "Search Components",
     searchPlaceholder: "Enter a name",
@@ -2166,11 +2169,12 @@ function renderComponentCatalog() {
   const selectedItem = catalog.find((item) => item.id === state.pickerSelectedCatalogId);
   pickerSelectionSummary.textContent = selectedItem
     ? t("selectedCatalog", {
-        name: getCatalogName(selectedItem),
-        type: getCatalogTypeLabel(selectedItem),
-      })
+      name: getCatalogName(selectedItem),
+      type: getCatalogTypeLabel(selectedItem),
+    })
     : t("nothingSelected");
   confirmComponentPicker.disabled = !selectedItem;
+  confirmComponentPickerTop.disabled = !selectedItem;
 }
 
 function openPicker() {
@@ -2186,6 +2190,11 @@ function openPicker() {
 function closePicker() {
   componentPicker.hidden = true;
   state.pickerSelectedCatalogId = null;
+}
+
+function confirmSelectedCatalogComponent() {
+  const selectedItem = catalog.find((item) => item.id === state.pickerSelectedCatalogId);
+  if (selectedItem) addPendingComponent(selectedItem);
 }
 
 function addPendingComponent(catalogItem) {
@@ -2502,10 +2511,8 @@ componentCatalog.addEventListener("click", (event) => {
   state.pickerSelectedCatalogId = item.dataset.catalogId;
   renderComponentCatalog();
 });
-confirmComponentPicker.addEventListener("click", () => {
-  const selectedItem = catalog.find((item) => item.id === state.pickerSelectedCatalogId);
-  if (selectedItem) addPendingComponent(selectedItem);
-});
+confirmComponentPicker.addEventListener("click", confirmSelectedCatalogComponent);
+confirmComponentPickerTop.addEventListener("click", confirmSelectedCatalogComponent);
 componentPicker.addEventListener("click", (event) => {
   if (event.target === componentPicker) closePicker();
 });
