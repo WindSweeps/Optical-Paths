@@ -1044,10 +1044,10 @@ input[type="search"] {
   .workspace {
     display: grid;
     grid-template-areas:
+      "placement"
       "canvas"
       "toolbar"
-      "status"
-      "placement";
+      "status";
     grid-template-rows: auto auto auto auto;
     order: 1;
     min-height: 0;
