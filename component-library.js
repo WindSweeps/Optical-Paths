@@ -159,7 +159,7 @@ window.OPTICAL_COMPONENT_LIBRARY = {
       "name": "一英寸波片架",
       "type": "modulator",
       "typeLabel": "偏振元件",
-      "visualKind": "mirror",
+      "visualKind": "waveplate",
       "defaultPlacement": {
         "xMm": 105,
         "yMm": 120,

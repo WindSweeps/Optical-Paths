@@ -325,6 +325,7 @@ const state = {
   holeCache: null,
   locale: localStorage.getItem("optical-layout-locale") === "en" ? "en" : "zh",
 };
+let renderedInspectorComponentId = null;
 
 function t(key, variables = {}) {
   const template = translations[state.locale][key] ?? translations.zh[key] ?? key;
@@ -1040,6 +1041,15 @@ function createCatalogThumbnail(definition) {
       x2: surface.endXmm,
       y2: surface.endYmm,
     }));
+  } else if (component.visualKind === "waveplate") {
+    const surface = component.optics.surface;
+    thumbnail.appendChild(createSvg("line", {
+      class: "waveplate-face",
+      x1: surface.startXmm,
+      y1: surface.startYmm,
+      x2: surface.endXmm,
+      y2: surface.endYmm,
+    }));
   } else {
     const surface = component.optics.surface;
     thumbnail.appendChild(createSvg("line", {
@@ -1494,6 +1504,17 @@ function renderComponent(component) {
         y2: surface.endYmm,
       }),
     );
+  } else if (component.visualKind === "waveplate") {
+    const surface = component.optics.surface;
+    group.appendChild(
+      createSvg("line", {
+        class: "waveplate-face",
+        x1: surface.startXmm,
+        y1: surface.startYmm,
+        x2: surface.endXmm,
+        y2: surface.endYmm,
+      }),
+    );
   } else {
     const surface = component.optics.surface;
     group.appendChild(
@@ -1835,18 +1856,22 @@ function renderInspector() {
   const selected = getSelected();
   inspector.hidden = !selected;
   emptyState.hidden = Boolean(selected);
-  if (!selected) return;
+  if (!selected) {
+    renderedInspectorComponentId = null;
+    return;
+  }
 
+  const selectedComponentChanged = renderedInspectorComponentId !== selected.id;
   componentLibraryName.textContent = getComponentLibraryName(selected);
   componentLabel.value = selected.label ?? selected.name;
-  if (document.activeElement !== componentPositionX) {
+  if (selectedComponentChanged || document.activeElement !== componentPositionX) {
     componentPositionX.value = formatMmInputValue(selected.position.x);
   }
-  if (document.activeElement !== componentPositionY) {
+  if (selectedComponentChanged || document.activeElement !== componentPositionY) {
     componentPositionY.value = formatMmInputValue(selected.position.y);
   }
   componentRotation.value = Math.round(selected.rotation);
-  if (document.activeElement !== componentRotationNumber) {
+  if (selectedComponentChanged || document.activeElement !== componentRotationNumber) {
     componentRotationNumber.value = formatAngleInputValue(selected.rotation);
   }
   componentRotationValue.textContent = `${formatAngleInputValue(selected.rotation)} deg`;
@@ -1857,8 +1882,11 @@ function renderInspector() {
   wavelengthControls.hidden = selected.optics.behavior !== "source";
   wavelengthControls.style.display = selected.optics.behavior === "source" ? "" : "none";
   if (selected.optics.behavior === "source") {
-    wavelengthInput.value = selected.wavelengthNm ?? 650;
-    wavelengthValue.textContent = `${selected.wavelengthNm ?? 650} nm`;
+    const wavelength = selected.wavelengthNm ?? 650;
+    if (selectedComponentChanged || document.activeElement !== wavelengthInput) {
+      wavelengthInput.value = wavelength;
+    }
+    wavelengthValue.textContent = `${wavelength} nm`;
   }
 
   const result = getStoredClampResult(selected);
@@ -1888,6 +1916,7 @@ function renderInspector() {
       ${t("retryMounting")}
     `;
   }
+  renderedInspectorComponentId = selected.id;
 }
 
 function renderPlacementUi() {
