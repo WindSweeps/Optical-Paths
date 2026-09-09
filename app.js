@@ -114,7 +114,7 @@ const translations = {
     mountingRules: "固定规则",
     mountingRulesText: "拖动元件后压板会自动选择最小转角的可用孔位。压板之间不能重合；螺丝被柱子挡住时仍可固定，但会显示警告。",
     opticalRules: "光路规则",
-    opticalRulesText: "光源沿元件角度发射光线。光线碰到反射镜后按入射角等于反射角反射；碰到分束立方时同时生成反射与透射分支。",
+    opticalRulesText: "光源按元件设定的出光方向发射光线。光线碰到反射镜后按入射角等于反射角反射；碰到分束立方时同时生成反射与透射分支。",
     resetView: "重置视图",
     clearAll: "清空元件",
     exportProject: "导出工程",
@@ -214,7 +214,7 @@ const translations = {
     mountingRules: "Mounting Rules",
     mountingRulesText: "After dragging a component, the clamp automatically selects an available hole with the smallest rotation. Clamps cannot overlap. A blocked screw is allowed but shown as a warning.",
     opticalRules: "Optical Rules",
-    opticalRulesText: "Sources emit along the component angle. Mirrors reflect with equal angles of incidence and reflection. Beamsplitter cubes generate reflected and transmitted branches.",
+    opticalRulesText: "Sources emit along their configured local output direction. Mirrors reflect with equal angles of incidence and reflection. Beamsplitter cubes generate reflected and transmitted branches.",
     resetView: "Reset View",
     clearAll: "Clear Components",
     exportProject: "Export Project",
@@ -289,6 +289,15 @@ const componentTranslations = {
   },
   "mirror-mount": {
     en: { name: "Ultrastable 1-inch Mirror Mount", typeLabel: "Reflective Element" },
+  },
+  "MT-AM1T1": {
+    en: { name: "Retaining-ring 1-inch Mirror Mount (MT-AM1T1 + PHC-32S + Ø25 mm Post)", typeLabel: "Reflective Element" },
+  },
+  "MT-AM1T": {
+    en: { name: "Retaining-ring 1-inch Mirror Mount (MT-AM1T + PHC-32S + Ø25 mm Post)", typeLabel: "Reflective Element" },
+  },
+  "MT-AM1T-fiber-coupler": {
+    en: { name: "MT-AM1T Fiber Coupler (MT-AM1T + PHC-32S + Ø25 mm Post)", typeLabel: "Source" },
   },
   "lens-mount": {
     en: { name: "Lens Mount", typeLabel: "Transmissive Element" },
@@ -618,6 +627,7 @@ function forkClampPolygon(clamp) {
   if (lengthToEnd < 0.001) return circlePolygon(0, 0, clamp.width / 2);
   const rotation = Math.atan2(end.y, end.x);
   const halfWidth = Math.max(0.5, clamp.width / 2);
+  const waistHalfWidth = Math.min(halfWidth, Math.max(0.5, (clamp.waistWidth ?? clamp.width) / 2));
   const endLength = Math.max(0.5, clamp.endLength);
   const forkRadius = Math.max(halfWidth + 0.5, clamp.forkOuterDiameter / 2);
   const clearanceRadius = Math.min(forkRadius - 0.5, Math.max(0.5, clamp.forkClearanceDiameter / 2));
@@ -630,8 +640,11 @@ function forkClampPolygon(clamp) {
     { x: 0, y: forkRadius },
     ...arcPoints({ x: 0, y: 0 }, forkRadius, Math.PI / 2, bodyAngle).slice(1),
     { x: joinX, y: halfWidth },
-    { x: lengthToEnd, y: halfWidth },
+    { x: Math.max(joinX, clamp.slotStart.x), y: waistHalfWidth },
+    { x: Math.max(joinX, lengthToEnd - endLength), y: waistHalfWidth },
     ...ellipseArcPoints({ x: lengthToEnd, y: 0 }, endLength, halfWidth, Math.PI / 2, -Math.PI / 2).slice(1),
+    { x: Math.max(joinX, lengthToEnd - endLength), y: -waistHalfWidth },
+    { x: Math.max(joinX, clamp.slotStart.x), y: -waistHalfWidth },
     { x: joinX, y: -halfWidth },
     ...arcPoints({ x: 0, y: 0 }, forkRadius, -bodyAngle, -Math.PI / 2).slice(1),
   ];
@@ -697,11 +710,12 @@ function polygonsOverlap(a, b) {
 function getComponentCollisionPolygons(component) {
   const { width, height } = component.size;
   const post = component.post;
+  const postCollisionDiameter = Math.max(post.diameter, post.collarDiameter ?? post.diameter);
   return [
     transformComponentPolygon(component, rectPolygon(-width / 2, -height / 2, width, height)),
     transformComponentPolygon(
       component,
-      circlePolygon(post.centerX, post.centerY, post.diameter / 2),
+      circlePolygon(post.centerX, post.centerY, postCollisionDiameter / 2),
     ),
   ];
 }
@@ -886,11 +900,15 @@ function makeComponent(definition, options = {}) {
       centerX: post.centerXmm,
       centerY: post.centerYmm,
       diameter: post.diameterMm,
+      collarDiameter: post.collarDiameterMm ?? post.diameterMm,
     },
     clamp: {
       width: clamp.widthMm,
+      waistWidth: clamp.waistWidthMm ?? clamp.widthMm,
       forkOuterDiameter: clamp.forkOuterDiameterMm,
       forkClearanceDiameter: clamp.forkClearanceDiameterMm,
+      slotCounterboreDiameter: clamp.slotCounterboreDiameterMm ?? 11,
+      slotThroughDiameter: clamp.slotThroughDiameterMm ?? 6,
       endLength: clamp.endLengthMm ?? clamp.widthMm / 2,
       slotStart: { x: clamp.slot.startXmm, y: clamp.slot.startYmm },
       slotEnd: { x: clamp.slot.endXmm, y: clamp.slot.endYmm },
@@ -926,11 +944,15 @@ function makeMissingComponent(snapshot) {
       centerX: Number(snapshot.post?.centerX) || 0,
       centerY: Number(snapshot.post?.centerY) || 0,
       diameter: Number(snapshot.post?.diameter) || 18,
+      collarDiameter: Number(snapshot.post?.collarDiameter) || Number(snapshot.post?.diameter) || 18,
     },
     clamp: {
       width: Number(snapshot.clamp?.width) || 12,
+      waistWidth: Number(snapshot.clamp?.waistWidth) || Number(snapshot.clamp?.width) || 12,
       forkOuterDiameter: Number(snapshot.clamp?.forkOuterDiameter) || 30,
       forkClearanceDiameter: Number(snapshot.clamp?.forkClearanceDiameter) || 20,
+      slotCounterboreDiameter: Number(snapshot.clamp?.slotCounterboreDiameter) || 11,
+      slotThroughDiameter: Number(snapshot.clamp?.slotThroughDiameter) || 6,
       endLength: Number(snapshot.clamp?.endLength) || 6,
       slotStart: snapshot.clamp?.slotStart ?? { x: 10, y: 0 },
       slotEnd: snapshot.clamp?.slotEnd ?? { x: 45, y: 0 },
@@ -965,6 +987,44 @@ function getCatalogThumbnailBounds(component) {
   return { minX, minY, width: maxX - minX, height: maxY - minY };
 }
 
+function isRetainingRingMount(component) {
+  return ["retaining-ring-mirror-mount", "retaining-ring-mirror-mount-knob"].includes(component.visualKind);
+}
+
+function appendRetainingRingMountVisual(parent, component) {
+  const hasLargeKnobs = component.visualKind === "retaining-ring-mirror-mount-knob";
+  const rearX = hasLargeKnobs ? -22.25 : -18.4;
+  const frontX = hasLargeKnobs ? -5.3 : -1.45;
+  const m4X = hasLargeKnobs ? 1.05 : 4.9;
+  const frontEdgeX = frontX + 12.7;
+  parent.appendChild(createSvg("rect", { class: "retaining-mount-frame", x: rearX, y: -25.4, width: 12.7, height: 50.8, rx: 1.8 }));
+  parent.appendChild(createSvg("rect", { class: "retaining-mount-frame front", x: frontX, y: -24.65, width: 12.7, height: 49.3, rx: 1.8 }));
+  [-17.9, 0, 17.9].forEach((cy) => {
+    parent.appendChild(createSvg("line", { class: "retaining-mount-flexure", x1: rearX + 12.7, y1: cy, x2: frontX, y2: cy }));
+  });
+  parent.appendChild(createSvg("rect", { class: "retaining-mount-m4-block", x: frontX, y: -5, width: 12.7, height: 10, rx: 1.5 }));
+  parent.appendChild(createSvg("circle", { class: "retaining-mount-m4-hole", cx: m4X, cy: 0, r: 3 }));
+  [-17.9, 17.9].forEach((cy) => {
+    parent.appendChild(createSvg("line", { class: "retaining-mount-adjuster-shaft", x1: frontEdgeX, y1: cy, x2: hasLargeKnobs ? 14 : 15.4, y2: cy }));
+    parent.appendChild(hasLargeKnobs
+      ? createSvg("rect", {
+          class: "retaining-mount-adjuster large",
+          x: 13.25,
+          y: cy - 5.4,
+          width: 9,
+          height: 10.8,
+          rx: 2.2,
+        })
+      : createSvg("ellipse", {
+          class: "retaining-mount-adjuster",
+          cx: 16.4,
+          cy,
+          rx: 2,
+          ry: 4.3,
+        }));
+  });
+}
+
 function createCatalogThumbnail(definition) {
   const component = makeComponent(definition);
   component.position = { x: 0, y: 0 };
@@ -986,11 +1046,20 @@ function createCatalogThumbnail(definition) {
     d: forkClampPath(component.clamp),
   }));
   clampGroup.appendChild(createSvg("line", {
+    class: "slot-counterbore",
+    x1: component.clamp.slotStart.x,
+    y1: component.clamp.slotStart.y,
+    x2: component.clamp.slotEnd.x,
+    y2: component.clamp.slotEnd.y,
+    "stroke-width": component.clamp.slotCounterboreDiameter,
+  }));
+  clampGroup.appendChild(createSvg("line", {
     class: "slot",
     x1: component.clamp.slotStart.x,
     y1: component.clamp.slotStart.y,
     x2: component.clamp.slotEnd.x,
     y2: component.clamp.slotEnd.y,
+    "stroke-width": component.clamp.slotThroughDiameter,
   }));
   clampGroup.appendChild(createSvg("circle", {
     class: "screw",
@@ -1002,7 +1071,7 @@ function createCatalogThumbnail(definition) {
 
   const { width, height } = component.size;
   thumbnail.appendChild(createSvg("rect", {
-    class: "component-body",
+    class: `component-body${isRetainingRingMount(component) ? " custom-mount-base" : ""}`,
     x: -width / 2,
     y: -height / 2,
     width,
@@ -1010,11 +1079,27 @@ function createCatalogThumbnail(definition) {
     rx: 3,
   }));
   thumbnail.appendChild(createSvg("circle", {
+    class: "post-collar",
+    cx: pivot.x,
+    cy: pivot.y,
+    r: component.post.collarDiameter / 2,
+  }));
+  thumbnail.appendChild(createSvg("circle", {
     class: "post",
     cx: pivot.x,
     cy: pivot.y,
     r: component.post.diameter / 2,
   }));
+  if (isRetainingRingMount(component)) {
+    appendRetainingRingMountVisual(thumbnail, component);
+    thumbnail.appendChild(clampGroup);
+    thumbnail.appendChild(createSvg("circle", {
+      class: "post",
+      cx: pivot.x,
+      cy: pivot.y,
+      r: component.post.diameter / 2,
+    }));
+  }
 
   if (component.visualKind === "source") {
     thumbnail.appendChild(createSvg("circle", {
@@ -1171,8 +1256,11 @@ function createProjectSnapshot() {
         post: { ...component.post },
         clamp: {
           width: component.clamp.width,
+          waistWidth: component.clamp.waistWidth,
           forkOuterDiameter: component.clamp.forkOuterDiameter,
           forkClearanceDiameter: component.clamp.forkClearanceDiameter,
+          slotCounterboreDiameter: component.clamp.slotCounterboreDiameter,
+          slotThroughDiameter: component.clamp.slotThroughDiameter,
           endLength: component.clamp.endLength,
           slotStart: { ...component.clamp.slotStart },
           slotEnd: { ...component.clamp.slotEnd },
@@ -1443,7 +1531,9 @@ function renderComponent(component) {
   }
   group.appendChild(
     createSvg("rect", {
-      class: component.missingCatalog ? "component-body missing-component-body" : "component-body",
+      class: component.missingCatalog
+        ? "component-body missing-component-body"
+        : `component-body${isRetainingRingMount(component) ? " custom-mount-base" : ""}`,
       x: -width / 2,
       y: -height / 2,
       width,
@@ -1451,6 +1541,9 @@ function renderComponent(component) {
       rx: 3,
     }),
   );
+  if (isRetainingRingMount(component)) {
+    appendRetainingRingMountVisual(group, component);
+  }
   if (component.visualKind === "missing") {
     group.appendChild(
       createSvg("line", {
@@ -1566,7 +1659,10 @@ function getComponentLabelBounds(component) {
   const clampResult = getStoredClampResult(component);
   const points = [
     ...transformComponentPolygon(component, rectPolygon(-width / 2, -height / 2, width, height)),
-    ...transformComponentPolygon(component, circlePolygon(post.centerX, post.centerY, post.diameter / 2)),
+    ...transformComponentPolygon(
+      component,
+      circlePolygon(post.centerX, post.centerY, Math.max(post.diameter, post.collarDiameter ?? post.diameter) / 2),
+    ),
     ...transformClampPolygon(component, clampResult.effectiveClampRotation),
   ].map(worldToScreen);
   const xs = points.map((point) => point.x);
@@ -1606,9 +1702,10 @@ function updateRenderedLabel(component) {
 
 function getSourceRay(component) {
   const sourcePort = component.optics.sourcePort ?? { xMm: component.size.width / 2 + 3, yMm: 0 };
+  const sourceDirectionDeg = component.optics.sourceDirectionDeg ?? 0;
   return {
     origin: localToWorld(component, mmPoint(sourcePort)),
-    direction: normalize(rotatePoint({ x: 1, y: 0 }, component.rotation)),
+    direction: normalize(rotatePoint({ x: 1, y: 0 }, component.rotation + sourceDirectionDeg)),
     wavelengthNm: component.wavelengthNm ?? 650,
   };
 }
@@ -1814,9 +1911,27 @@ function renderClamp(component, result, isSelected) {
   });
 
   clampGroup.appendChild(
+    createSvg("circle", {
+      class: "post-collar",
+      cx: 0,
+      cy: 0,
+      r: component.post.collarDiameter / 2,
+    }),
+  );
+  clampGroup.appendChild(
     createSvg("path", {
       class: "clamp",
       d: forkClampPath(component.clamp),
+    }),
+  );
+  clampGroup.appendChild(
+    createSvg("line", {
+      class: "slot-counterbore",
+      x1: component.clamp.slotStart.x,
+      y1: component.clamp.slotStart.y,
+      x2: component.clamp.slotEnd.x,
+      y2: component.clamp.slotEnd.y,
+      "stroke-width": component.clamp.slotCounterboreDiameter,
     }),
   );
   clampGroup.appendChild(
@@ -1826,6 +1941,7 @@ function renderClamp(component, result, isSelected) {
       y1: component.clamp.slotStart.y,
       x2: component.clamp.slotEnd.x,
       y2: component.clamp.slotEnd.y,
+      "stroke-width": component.clamp.slotThroughDiameter,
     }),
   );
   clampGroup.appendChild(

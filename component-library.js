@@ -28,12 +28,16 @@ window.OPTICAL_COMPONENT_LIBRARY = {
           "widthMm": 18,
           "forkOuterDiameterMm": 32.8,
           "forkClearanceDiameterMm": 25,
-          "endLengthMm": 13
+          "endLengthMm": 13,
+          "waistWidthMm": 18,
+          "slotCounterboreDiameterMm": 11,
+          "slotThroughDiameterMm": 6
         },
         "post": {
           "centerXmm": 2.6,
           "centerYmm": 0,
-          "diameterMm": 25
+          "diameterMm": 25,
+          "collarDiameterMm": 25
         }
       },
       "optics": {
@@ -49,7 +53,8 @@ window.OPTICAL_COMPONENT_LIBRARY = {
           "endXmm": 13,
           "endYmm": -10
         },
-        "outputWavelengthNm": 532
+        "outputWavelengthNm": 532,
+        "sourceDirectionDeg": 0
       }
     },
     {
@@ -79,12 +84,16 @@ window.OPTICAL_COMPONENT_LIBRARY = {
           "widthMm": 18,
           "forkOuterDiameterMm": 32.8,
           "forkClearanceDiameterMm": 25,
-          "endLengthMm": 13
+          "endLengthMm": 13,
+          "waistWidthMm": 18,
+          "slotCounterboreDiameterMm": 11,
+          "slotThroughDiameterMm": 6
         },
         "post": {
           "centerXmm": 2.6,
           "centerYmm": 0,
-          "diameterMm": 25
+          "diameterMm": 25,
+          "collarDiameterMm": 25
         }
       },
       "optics": {
@@ -130,12 +139,16 @@ window.OPTICAL_COMPONENT_LIBRARY = {
           "widthMm": 18,
           "forkOuterDiameterMm": 32.8,
           "forkClearanceDiameterMm": 25,
-          "endLengthMm": 13
+          "endLengthMm": 13,
+          "waistWidthMm": 18,
+          "slotCounterboreDiameterMm": 11,
+          "slotThroughDiameterMm": 6
         },
         "post": {
           "centerXmm": 0,
           "centerYmm": 0,
-          "diameterMm": 25
+          "diameterMm": 25,
+          "collarDiameterMm": 25
         }
       },
       "optics": {
@@ -145,6 +158,61 @@ window.OPTICAL_COMPONENT_LIBRARY = {
           "startYmm": 12.7,
           "endXmm": 0,
           "endYmm": -12.7
+        },
+        "wavelengthNm": 650,
+        "sourcePort": {
+          "xMm": 23,
+          "yMm": 0
+        },
+        "outputWavelengthNm": 532
+      }
+    },
+    {
+      "id": "MT-AM1T1",
+      "name": "卡环固定1英寸不锈钢镜架（MT-AM1T1 + PHC-32S + Ø25 mm 柱子）",
+      "type": "reflector",
+      "typeLabel": "反射元件",
+      "visualKind": "retaining-ring-mirror-mount",
+      "defaultPlacement": {
+        "xMm": 105,
+        "yMm": 130,
+        "rotationDeg": -135
+      },
+      "geometry": {
+        "body": {
+          "widthMm": 36.8,
+          "heightMm": 50.8
+        },
+        "post": {
+          "centerXmm": 4.9,
+          "centerYmm": 0,
+          "diameterMm": 25.8,
+          "collarDiameterMm": 32.8
+        },
+        "clamp": {
+          "widthMm": 18,
+          "waistWidthMm": 13,
+          "forkOuterDiameterMm": 32.8,
+          "forkClearanceDiameterMm": 25.4,
+          "slotCounterboreDiameterMm": 11,
+          "slotThroughDiameterMm": 6,
+          "endLengthMm": 13,
+          "slot": {
+            "startXmm": 27,
+            "startYmm": 0,
+            "endXmm": 59,
+            "endYmm": 0
+          },
+          "defaultRotationDeg": 22
+        }
+      },
+      "optics": {
+        "behavior": "reflect",
+        "surface": {
+          "startXmm": -18.4,
+          "startYmm": -12.7,
+          "endXmm": -18.4,
+          "endYmm": 12.7
         },
         "wavelengthNm": 650,
         "sourcePort": {
@@ -173,7 +241,8 @@ window.OPTICAL_COMPONENT_LIBRARY = {
         "post": {
           "centerXmm": -1.6,
           "centerYmm": 0,
-          "diameterMm": 25
+          "diameterMm": 25,
+          "collarDiameterMm": 25
         },
         "clamp": {
           "widthMm": 18,
@@ -186,7 +255,10 @@ window.OPTICAL_COMPONENT_LIBRARY = {
             "endXmm": 59,
             "endYmm": 0
           },
-          "defaultRotationDeg": 22
+          "defaultRotationDeg": 22,
+          "waistWidthMm": 18,
+          "slotCounterboreDiameterMm": 11,
+          "slotThroughDiameterMm": 6
         }
       },
       "optics": {
@@ -224,7 +296,8 @@ window.OPTICAL_COMPONENT_LIBRARY = {
         "post": {
           "centerXmm": 0,
           "centerYmm": 0,
-          "diameterMm": 25
+          "diameterMm": 25,
+          "collarDiameterMm": 25
         },
         "clamp": {
           "widthMm": 18,
@@ -237,7 +310,10 @@ window.OPTICAL_COMPONENT_LIBRARY = {
             "endXmm": 59,
             "endYmm": 0
           },
-          "defaultRotationDeg": 22
+          "defaultRotationDeg": 22,
+          "waistWidthMm": 18,
+          "slotCounterboreDiameterMm": 11,
+          "slotThroughDiameterMm": 6
         }
       },
       "optics": {
@@ -251,6 +327,117 @@ window.OPTICAL_COMPONENT_LIBRARY = {
           "startXmm": -12.7,
           "startYmm": -12.7,
           "endXmm": 12.7,
+          "endYmm": 12.7
+        },
+        "outputWavelengthNm": 532
+      }
+    },
+    {
+      "id": "MT-AM1T",
+      "name": "卡环固定1英寸不锈钢镜架（MT-AM1T + PHC-32S + Ø25 mm 柱子）",
+      "type": "reflector",
+      "typeLabel": "反射元件",
+      "visualKind": "retaining-ring-mirror-mount-knob",
+      "defaultPlacement": {
+        "xMm": 105,
+        "yMm": 130,
+        "rotationDeg": -135
+      },
+      "geometry": {
+        "body": {
+          "widthMm": 44.5,
+          "heightMm": 50.8
+        },
+        "post": {
+          "centerXmm": 1.05,
+          "centerYmm": 0,
+          "diameterMm": 25.8,
+          "collarDiameterMm": 32.8
+        },
+        "clamp": {
+          "widthMm": 18,
+          "waistWidthMm": 13,
+          "forkOuterDiameterMm": 32.8,
+          "forkClearanceDiameterMm": 25.4,
+          "slotCounterboreDiameterMm": 11,
+          "slotThroughDiameterMm": 6,
+          "endLengthMm": 13,
+          "slot": {
+            "startXmm": 27,
+            "startYmm": 0,
+            "endXmm": 59,
+            "endYmm": 0
+          },
+          "defaultRotationDeg": 22
+        }
+      },
+      "optics": {
+        "behavior": "reflect",
+        "surface": {
+          "startXmm": -22.25,
+          "startYmm": -12.7,
+          "endXmm": -22.25,
+          "endYmm": 12.7
+        },
+        "wavelengthNm": 650,
+        "sourcePort": {
+          "xMm": 23,
+          "yMm": 0
+        },
+        "outputWavelengthNm": 532
+      }
+    },
+    {
+      "id": "MT-AM1T-fiber-coupler",
+      "name": "MT-AM1T光纤耦合头（MT-AM1T + PHC-32S + Ø25 mm 柱子）",
+      "type": "source",
+      "typeLabel": "光源",
+      "visualKind": "retaining-ring-mirror-mount-knob",
+      "defaultPlacement": {
+        "xMm": 70,
+        "yMm": 150,
+        "rotationDeg": 0
+      },
+      "geometry": {
+        "body": {
+          "widthMm": 44.5,
+          "heightMm": 50.8
+        },
+        "post": {
+          "centerXmm": 1.05,
+          "centerYmm": 0,
+          "diameterMm": 25.8,
+          "collarDiameterMm": 32.8
+        },
+        "clamp": {
+          "widthMm": 18,
+          "waistWidthMm": 13,
+          "forkOuterDiameterMm": 32.8,
+          "forkClearanceDiameterMm": 25.4,
+          "slotCounterboreDiameterMm": 11,
+          "slotThroughDiameterMm": 6,
+          "endLengthMm": 13,
+          "slot": {
+            "startXmm": 27,
+            "startYmm": 0,
+            "endXmm": 59,
+            "endYmm": 0
+          },
+          "defaultRotationDeg": 22
+        }
+      },
+      "optics": {
+        "behavior": "source",
+        "wavelengthNm": 650,
+        "sourcePort": {
+          "xMm": -22.25,
+          "yMm": 0
+        },
+        "sourceDirectionDeg": 180,
+        "surface": {
+          "startXmm": -22.25,
+          "startYmm": -12.7,
+          "endXmm": -22.25,
           "endYmm": 12.7
         },
         "outputWavelengthNm": 532

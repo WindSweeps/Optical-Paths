@@ -635,6 +635,53 @@ p {
   stroke-width: 1.1;
 }
 
+.custom-mount-base {
+  fill: transparent;
+  stroke: transparent;
+}
+
+.retaining-mount-frame {
+  fill: #dbe3ec;
+  stroke: rgba(55, 90, 127, 0.58);
+  stroke-width: 1.2;
+}
+
+.retaining-mount-frame.front {
+  fill: #eef2f6;
+}
+
+.retaining-mount-flexure,
+.retaining-mount-adjuster-shaft {
+  stroke: #64748b;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.retaining-mount-m4-block {
+  fill: #c8d1dc;
+  stroke: #4b596b;
+  stroke-width: 0.9;
+}
+
+.retaining-mount-m4-hole {
+  fill: #f8fafc;
+  stroke: #37475a;
+  stroke-width: 1;
+}
+
+.retaining-mount-adjuster {
+  fill: #aab4c1;
+  stroke: #435165;
+  stroke-width: 1;
+}
+
+.retaining-mount-adjuster.large {
+  fill: #303846;
+  stroke: #172033;
+  stroke-width: 1.2;
+}
+
+
 .missing-component-body {
   fill: #fff1f0;
   stroke: #d92d20;
@@ -649,6 +696,12 @@ p {
 
 .post {
   fill: #3d4656;
+}
+
+.post-collar {
+  fill: #737d8c;
+  stroke: rgba(23, 32, 51, 0.5);
+  stroke-width: 0.9;
 }
 
 .optic {
@@ -721,7 +774,11 @@ p {
 
 .slot {
   stroke: rgba(111, 72, 12, 0.62);
-  stroke-width: 4.2;
+  stroke-linecap: round;
+}
+
+.slot-counterbore {
+  stroke: rgba(159, 107, 19, 0.42);
   stroke-linecap: round;
 }
 
