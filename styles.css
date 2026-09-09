@@ -620,6 +620,11 @@ p {
   opacity: 0.88;
 }
 
+.component.collision-preview.upper-overlap > :not(.pending-outline) {
+  filter: grayscale(1);
+  opacity: 0.38;
+}
+
 .clamp-group.pending .clamp {
   fill: #bcebed;
   stroke: #147783;

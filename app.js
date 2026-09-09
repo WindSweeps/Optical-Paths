@@ -112,7 +112,7 @@ const translations = {
     sourceWavelength: "光源波长",
     deleteComponent: "删除元件",
     mountingRules: "固定规则",
-    mountingRulesText: "拖动元件后压板会自动选择最小转角的可用孔位。压板之间不能重合；螺丝被柱子挡住时仍可固定，但会显示警告。",
+    mountingRulesText: "拖动元件后压板会自动选择最小转角的可用孔位。上层元件之间不能重合，下层柱子与压板之间也不能重合；螺丝被上层支架挡住时仍可固定，但会显示警告。",
     opticalRules: "光路规则",
     opticalRulesText: "光源按元件设定的出光方向发射光线。光线碰到反射镜后按入射角等于反射角反射；碰到分束立方时同时生成反射与透射分支。",
     resetView: "重置视图",
@@ -174,8 +174,8 @@ const translations = {
     blockedScrew: "螺丝中心被柱子挡住，实际安装时可能拧不到。",
     mounted: "固定成功",
     screwHole: "螺丝孔：({x}, {y}) mm",
-    noClampOverlap: "压板没有与其他压板重合。",
-    overlapFailure: "可用孔位会导致压板与其他压板重合。",
+    noClampOverlap: "上层元件和下层固定结构均无重合。",
+    overlapFailure: "该位置会导致上层元件或下层柱子、压板与其他元件重合。",
     noHoleFailure: "在 ±{angle} deg 自动转角范围内找不到可用孔位。",
     mountingFailed: "无法固定",
     retryMounting: "拖动元件即可重新自动寻找压板角度。",
@@ -212,7 +212,7 @@ const translations = {
     sourceWavelength: "Source Wavelength",
     deleteComponent: "Delete Component",
     mountingRules: "Mounting Rules",
-    mountingRulesText: "After dragging a component, the clamp automatically selects an available hole with the smallest rotation. Clamps cannot overlap. A blocked screw is allowed but shown as a warning.",
+    mountingRulesText: "After dragging a component, the clamp selects an available hole with the smallest rotation. Upper components cannot overlap each other, and lower posts and clamps cannot overlap other lower mounting geometry. A screw blocked by an upper support is allowed but shown as a warning.",
     opticalRules: "Optical Rules",
     opticalRulesText: "Sources emit along their configured local output direction. Mirrors reflect with equal angles of incidence and reflection. Beamsplitter cubes generate reflected and transmitted branches.",
     resetView: "Reset View",
@@ -274,8 +274,8 @@ const translations = {
     blockedScrew: "The screw center is blocked by a post and may be inaccessible during installation.",
     mounted: "Mounted",
     screwHole: "Screw hole: ({x}, {y}) mm",
-    noClampOverlap: "The clamp does not overlap another clamp.",
-    overlapFailure: "Available holes would cause the clamp to overlap another clamp.",
+    noClampOverlap: "No overlap exists within either the upper component layer or the lower mounting layer.",
+    overlapFailure: "This position overlaps another component in the upper layer or another post/clamp in the lower layer.",
     noHoleFailure: "No available hole was found within the ±{angle} deg auto-rotation range.",
     mountingFailed: "Cannot mount",
     retryMounting: "Drag the component to automatically search for a new clamp angle.",
@@ -707,17 +707,74 @@ function polygonsOverlap(a, b) {
   return pointInPolygon(a[0], b) || pointInPolygon(b[0], a);
 }
 
-function getComponentCollisionPolygons(component) {
+const localCollisionGeometryCache = new WeakMap();
+const upperCollisionCache = new WeakMap();
+const lowerCollisionCache = new WeakMap();
+
+function polygonBounds(polygon) {
+  const xs = polygon.map((point) => point.x);
+  const ys = polygon.map((point) => point.y);
+  return {
+    minX: Math.min(...xs),
+    minY: Math.min(...ys),
+    maxX: Math.max(...xs),
+    maxY: Math.max(...ys),
+  };
+}
+
+function boundsOverlap(a, b) {
+  return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
+}
+
+function collisionShape(polygon) {
+  return { polygon, bounds: polygonBounds(polygon) };
+}
+
+function collisionSetsOverlap(a, b) {
+  return a.some((aShape) =>
+    b.some((bShape) =>
+      boundsOverlap(aShape.bounds, bShape.bounds) && polygonsOverlap(aShape.polygon, bShape.polygon),
+    ),
+  );
+}
+
+function getLocalCollisionGeometry(component) {
+  const cached = localCollisionGeometryCache.get(component);
+  if (cached) return cached;
   const { width, height } = component.size;
   const post = component.post;
   const postCollisionDiameter = Math.max(post.diameter, post.collarDiameter ?? post.diameter);
-  return [
-    transformComponentPolygon(component, rectPolygon(-width / 2, -height / 2, width, height)),
-    transformComponentPolygon(
-      component,
-      circlePolygon(post.centerX, post.centerY, postCollisionDiameter / 2),
-    ),
+  const geometry = {
+    upper: rectPolygon(-width / 2, -height / 2, width, height),
+    post: circlePolygon(post.centerX, post.centerY, postCollisionDiameter / 2, 12),
+    clamp: forkClampPolygon(component.clamp),
+  };
+  localCollisionGeometryCache.set(component, geometry);
+  return geometry;
+}
+
+function getUpperCollisionShapes(component) {
+  const key = `${component.position.x}:${component.position.y}:${component.rotation}`;
+  const cached = upperCollisionCache.get(component);
+  if (cached?.key === key) return cached.shapes;
+  const shapes = [collisionShape(transformComponentPolygon(component, getLocalCollisionGeometry(component).upper))];
+  upperCollisionCache.set(component, { key, shapes });
+  return shapes;
+}
+
+function getLowerCollisionShapes(component, clampRotationDeg = component.clamp.rotation) {
+  const key = `${component.position.x}:${component.position.y}:${component.rotation}:${clampRotationDeg}`;
+  const cached = lowerCollisionCache.get(component);
+  if (cached?.key === key) return cached.shapes;
+  const local = getLocalCollisionGeometry(component);
+  const pivotWorld = localToWorld(component, getPostCenter(component));
+  const totalClampRotation = component.rotation + clampRotationDeg;
+  const shapes = [
+    collisionShape(transformComponentPolygon(component, local.post)),
+    collisionShape(local.clamp.map((point) => add(pivotWorld, rotatePoint(point, totalClampRotation)))),
   ];
+  lowerCollisionCache.set(component, { key, shapes });
+  return shapes;
 }
 
 function pointInPolygon(point, polygon) {
@@ -736,17 +793,31 @@ function pointInPolygon(point, polygon) {
   return inside;
 }
 
-function clampCollidesWithOtherClamps(component, clampRotationDeg) {
-  const clampPolygon = transformClampPolygon(component, clampRotationDeg);
+function upperLayerCollides(component) {
+  const upperShapes = getUpperCollisionShapes(component);
   return state.components.some((otherComponent) =>
     otherComponent.id !== component.id &&
-    polygonsOverlap(clampPolygon, transformClampPolygon(otherComponent, otherComponent.clamp.rotation)),
+    collisionSetsOverlap(upperShapes, getUpperCollisionShapes(otherComponent)),
+  );
+}
+
+function lowerLayerCollides(component, clampRotationDeg) {
+  const lowerShapes = getLowerCollisionShapes(component, clampRotationDeg);
+  return state.components.some((otherComponent) =>
+    otherComponent.id !== component.id &&
+    collisionSetsOverlap(lowerShapes, getLowerCollisionShapes(otherComponent)),
   );
 }
 
 function screwBlockedBySupport(screwPoint) {
   return state.components.some((component) =>
-    getComponentCollisionPolygons(component).some((polygon) => pointInPolygon(screwPoint, polygon)),
+    getUpperCollisionShapes(component).some((shape) =>
+      screwPoint.x >= shape.bounds.minX &&
+      screwPoint.x <= shape.bounds.maxX &&
+      screwPoint.y >= shape.bounds.minY &&
+      screwPoint.y <= shape.bounds.maxY &&
+      pointInPolygon(screwPoint, shape.polygon),
+    ),
   );
 }
 
@@ -756,6 +827,7 @@ function evaluateClamp(component) {
   const slotVector = sub(clamp.slotEnd, clamp.slotStart);
   const slotAngleLocal = radToDeg(Math.atan2(slotVector.y, slotVector.x));
   const holes = generateHoles(state.table);
+  const upperOverlap = upperLayerCollides(component);
   const rawCandidates = holes
     .map((hole) => {
       const fromPivot = sub(hole, pivot);
@@ -784,12 +856,13 @@ function evaluateClamp(component) {
       };
     })
     .filter(Boolean);
-  const candidates = rawCandidates
+  const evaluatedCandidates = rawCandidates
     .map((candidate) => ({
       ...candidate,
-      clampOverlap: clampCollidesWithOtherClamps(component, candidate.effectiveClampRotation),
+      clampOverlap: upperOverlap || lowerLayerCollides(component, candidate.effectiveClampRotation),
       screwBlocked: screwBlockedBySupport(candidate.hole),
-    }))
+    }));
+  const candidates = evaluatedCandidates
     .filter((candidate) => !candidate.clampOverlap)
     .sort((a, b) => {
       if (a.screwBlocked !== b.screwBlocked) return Number(a.screwBlocked) - Number(b.screwBlocked);
@@ -814,7 +887,8 @@ function evaluateClamp(component) {
     angleDelta: candidate?.angleDelta ?? 0,
     effectiveClampRotation: effectiveRotation,
     screwBlocked: Boolean(candidate?.screwBlocked),
-    blockedByClampOverlap: !candidate && rawCandidates.some((item) => item.clampOverlap),
+    upperOverlap,
+    blockedByClampOverlap: !candidate && (upperOverlap || evaluatedCandidates.some((item) => item.clampOverlap)),
     slotStart,
     slotEnd,
   };
@@ -827,6 +901,7 @@ function snapshotClampResult(result) {
     angleDelta: result.angleDelta,
     effectiveClampRotation: result.effectiveClampRotation,
     screwBlocked: result.screwBlocked,
+    upperOverlap: result.upperOverlap,
     blockedByClampOverlap: result.blockedByClampOverlap,
   };
 }
@@ -1493,8 +1568,12 @@ function renderTable() {
 function renderComponent(component) {
   const isSelected = component.id === state.selectedId;
   const isPending = component.id === state.pendingComponentId;
+  const isDragging = state.drag?.id === component.id;
+  const isPositioning = isPending || isDragging;
+  const collisionResult = isPositioning ? getStoredClampResult(component) : null;
+  const hasUpperPlacementOverlap = Boolean(isPositioning && !collisionResult.valid && collisionResult.upperOverlap);
   const group = createSvg("g", {
-    class: `component${isSelected ? " selected" : ""}${isPending ? " pending" : ""}`,
+    class: `component${isSelected ? " selected" : ""}${isPending ? " pending" : ""}${isPositioning ? " collision-preview" : ""}${hasUpperPlacementOverlap ? " upper-overlap" : ""}`,
     "data-id": component.id,
     "data-component-id": component.id,
   });
