@@ -291,13 +291,28 @@ const componentTranslations = {
     en: { name: "Ultrastable 1-inch Mirror Mount", typeLabel: "Reflective Element" },
   },
   "MT-AM1T1": {
-    en: { name: "Retaining-ring 1-inch Mirror Mount (MT-AM1T1 + PHC-32S + Ø25 mm Post)", typeLabel: "Reflective Element" },
+    en: { name: "Retaining-ring 1-inch Mirror Mount", typeLabel: "Reflective Element" },
   },
   "MT-AM1T": {
-    en: { name: "Retaining-ring 1-inch Mirror Mount (MT-AM1T + PHC-32S + Ø25 mm Post)", typeLabel: "Reflective Element" },
+    en: { name: "Retaining-ring 1-inch Mirror Mount", typeLabel: "Reflective Element" },
   },
   "MT-AM1T-fiber-coupler": {
-    en: { name: "MT-AM1T Fiber Coupler (MT-AM1T + PHC-32S + Ø25 mm Post)", typeLabel: "Source" },
+    en: { name: "Fiber Coupler", typeLabel: "Source" },
+  },
+  "lens-mount-phc10s": {
+    en: { name: "Lens Mount + Short Clamp", typeLabel: "Transmissive Element" },
+  },
+  "waveplate1inch-phc10s": {
+    en: { name: "1-inch Wave Plate Mount + Short Clamp", typeLabel: "Polarization Element" },
+  },
+  "beamsplitter-cube-1inch-phc10s": {
+    en: { name: "1-inch Beamsplitter Cube + Short Clamp", typeLabel: "Beamsplitter" },
+  },
+  "MT-AM1T-phc10s": {
+    en: { name: "Retaining-ring 1-inch Mirror Mount + Short Clamp", typeLabel: "Reflective Element" },
+  },
+  "MT-AM1T-fiber-coupler-phc10s": {
+    en: { name: "Fiber Coupler + Short Clamp", typeLabel: "Source" },
   },
   "lens-mount": {
     en: { name: "Lens Mount", typeLabel: "Transmissive Element" },
@@ -313,7 +328,8 @@ const publishedLibrary = window.OPTICAL_COMPONENT_LIBRARY;
 if (!publishedLibrary?.components?.length) {
   throw new Error("Published component library is missing or empty.");
 }
-const catalog = publishedLibrary.components;
+const hiddenPublicComponentIds = new Set(["laser-source", "mirror-mount"]);
+const catalog = publishedLibrary.components.filter((component) => !hiddenPublicComponentIds.has(component.id));
 
 const state = {
   table: presets["300x300"],
@@ -354,6 +370,10 @@ function getCatalogName(definition) {
 
 function getCatalogTypeLabel(definition) {
   return componentTranslations[definition.id]?.[state.locale]?.typeLabel ?? definition.typeLabel;
+}
+
+function getCatalogDetails(definition) {
+  return [definition.modelNumber, definition.clampModel, definition.postSpec].filter(Boolean).join(" · ");
 }
 
 function getComponentDefinition(component) {
@@ -2359,11 +2379,13 @@ function renderComponentCatalog() {
   const filteredCatalog = catalog.filter((item) => {
     const localizedName = getCatalogName(item).toLowerCase();
     const localizedTypeLabel = getCatalogTypeLabel(item).toLowerCase();
+    const catalogDetails = getCatalogDetails(item).toLowerCase();
     const matchesType = type === "all" || item.type === type;
     const matchesQuery =
       query === "" ||
       localizedName.includes(query) ||
       localizedTypeLabel.includes(query) ||
+      catalogDetails.includes(query) ||
       item.name.toLowerCase().includes(query) ||
       item.typeLabel.toLowerCase().includes(query);
     return matchesType && matchesQuery;
@@ -2379,7 +2401,10 @@ function renderComponentCatalog() {
     name.textContent = getCatalogName(item);
     const typeLabel = document.createElement("span");
     typeLabel.textContent = getCatalogTypeLabel(item);
-    button.append(createCatalogThumbnail(item), name, typeLabel);
+    const details = document.createElement("small");
+    details.className = "catalog-details";
+    details.textContent = getCatalogDetails(item);
+    button.append(createCatalogThumbnail(item), name, details, typeLabel);
     componentCatalog.appendChild(button);
   });
 

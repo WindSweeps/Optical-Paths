@@ -970,10 +970,10 @@ input[type="search"] {
 
 .catalog-item {
   display: grid;
-  grid-template-rows: 84px auto auto;
-  gap: 7px;
+  grid-template-rows: 84px auto auto auto;
+  gap: 5px;
   align-content: start;
-  min-height: 146px;
+  min-height: 166px;
   padding: 10px;
   text-align: left;
 }
@@ -991,6 +991,13 @@ input[type="search"] {
 .catalog-item span {
   color: #667085;
   font-size: 12px;
+}
+
+.catalog-details {
+  min-height: 14px;
+  color: #475467;
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .catalog-thumbnail {
