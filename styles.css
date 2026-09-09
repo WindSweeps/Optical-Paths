@@ -973,7 +973,7 @@ input[type="search"] {
   grid-template-rows: 84px auto auto auto;
   gap: 5px;
   align-content: start;
-  min-height: 166px;
+  min-height: 200px;
   padding: 10px;
   text-align: left;
 }
@@ -1092,7 +1092,7 @@ input[type="search"] {
   }
 
   .catalog-item {
-    min-height: 162px;
+    min-height: 218px;
   }
 
   .catalog-thumbnail {
