@@ -2745,9 +2745,9 @@ languageSelect.addEventListener("change", () => {
 
 applyStaticTranslations();
 updateReportIssueLink();
-state.components.push(makeComponent(catalog.find((item) => item.id === "laser-source")));
+state.components.push(makeComponent(catalog.find((item) => item.id === "MT-AM1T-fiber-coupler")));
 state.components.push({
-  ...makeComponent(catalog.find((item) => item.id === "mirror-mount")),
+  ...makeComponent(catalog.find((item) => item.id === "MT-AM1T")),
   position: { x: 150, y: 160 },
 });
 state.selectedId = state.components[1].id;

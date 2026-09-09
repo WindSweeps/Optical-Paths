@@ -341,7 +341,7 @@ window.OPTICAL_COMPONENT_LIBRARY = {
       "defaultPlacement": {
         "xMm": 105,
         "yMm": 130,
-        "rotationDeg": -135
+        "rotationDeg": 45
       },
       "geometry": {
         "body": {
@@ -396,7 +396,7 @@ window.OPTICAL_COMPONENT_LIBRARY = {
       "defaultPlacement": {
         "xMm": 70,
         "yMm": 150,
-        "rotationDeg": 0
+        "rotationDeg": 180
       },
       "geometry": {
         "body": {
